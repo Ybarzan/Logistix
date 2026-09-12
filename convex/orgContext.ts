@@ -3,10 +3,38 @@ import { DEFAULT_ORG_SLUG } from "./organizations";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 
+export type Role = "admin" | "manager" | "operator" | "viewer";
+
 export type OrgScope = {
   userId: Id<"users">;
   orgId: Id<"organizations">;
+  role: Role;
 };
+
+/**
+ * Rang de chaque rôle pour la hiérarchie d'héritage :
+ * admin > manager > operator > viewer. Un rôle supérieur hérite
+ * des permissions des rôles inférieurs.
+ */
+const ROLE_RANK: Record<Role, number> = {
+  viewer: 0,
+  operator: 1,
+  manager: 2,
+  admin: 3,
+};
+
+/**
+ * Vérifie que l'utilisateur est authentifié et possède au moins le rôle
+ * `minRole`. Retourne le scope si c'est le cas, jette une erreur sinon.
+ * À appeler en tête de toute mutation soumise au RBAC.
+ */
+export function requireRole(scope: OrgScope | null, minRole: Role): OrgScope {
+  if (!scope) throw new Error("Non authentifié");
+  if (ROLE_RANK[scope.role] < ROLE_RANK[minRole]) {
+    throw new Error("Permissions insuffisantes");
+  }
+  return scope;
+}
 
 /**
  * Retourne l'utilisateur courant et son organisation, ou `null` si
@@ -35,5 +63,7 @@ export async function getOrgScope(
     }
   }
   if (!orgId) return null;
-  return { userId, orgId };
+  // Rôle absent (compte créé avant l'ajout du champ) → "viewer" :
+  // moindre privilège, lecture seule, fail-safe.
+  return { userId, orgId, role: user.role ?? "viewer" };
 }

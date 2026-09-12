@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
-import { getOrgScope } from "./orgContext";
+import { getOrgScope, requireRole } from "./orgContext";
 
 export const list = query({
   args: {},
@@ -16,6 +16,7 @@ export const list = query({
     lat: v.number(),
     lng: v.number(),
     isActive: v.boolean(),
+    orgId: v.optional(v.id("organizations")),
   })),
   handler: async (ctx) => {
     const scope = await getOrgScope(ctx);
@@ -41,8 +42,7 @@ export const create = mutation({
   },
   returns: v.id("hubs"),
   handler: async (ctx, args) => {
-    const scope = await getOrgScope(ctx);
-    if (!scope) throw new Error("Non authentifié");
+    const scope = requireRole(await getOrgScope(ctx), "manager");
     return await ctx.db.insert("hubs", { ...args, orgId: scope.orgId });
   },
 });
@@ -62,8 +62,7 @@ export const update = mutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const scope = await getOrgScope(ctx);
-    if (!scope) throw new Error("Non authentifié");
+    const scope = requireRole(await getOrgScope(ctx), "manager");
     const hub = await ctx.db.get("hubs", args.hubId);
     if (!hub) throw new Error("Entrepôt introuvable");
     if (hub.orgId !== scope.orgId) throw new Error("Accès refusé");

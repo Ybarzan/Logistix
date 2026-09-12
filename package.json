@@ -11,6 +11,7 @@
     "build": "vite build && tsc --noEmit",
     "start": "node .output/server/index.mjs",
     "format": "prettier --write .",
+    "test": "tsx --test \"convex/test/*.test.ts\"",
     "lint": "tsc && eslint .  --ext ts,tsx --report-unused-disable-directives --max-warnings 0"
   },
   "dependencies": {

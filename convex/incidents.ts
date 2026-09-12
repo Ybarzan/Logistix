@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
-import { getOrgScope } from "./orgContext";
+import { getOrgScope, requireRole } from "./orgContext";
 
 const incidentFields = v.object({
   _id: v.id("incidents"),
@@ -21,6 +21,7 @@ const incidentFields = v.object({
   status: v.union(v.literal("open"), v.literal("investigating"), v.literal("resolved")),
   createdAt: v.number(),
   resolvedAt: v.optional(v.number()),
+  orgId: v.optional(v.id("organizations")),
 });
 
 export const list = query({
@@ -71,8 +72,7 @@ export const create = mutation({
   },
   returns: v.id("incidents"),
   handler: async (ctx, args) => {
-    const scope = await getOrgScope(ctx);
-    if (!scope) throw new Error("Non authentifié");
+    const scope = requireRole(await getOrgScope(ctx), "operator");
     return await ctx.db.insert("incidents", {
       orgId: scope.orgId,
       type: args.type,
@@ -91,8 +91,7 @@ export const resolve = mutation({
   args: { incidentId: v.id("incidents") },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const scope = await getOrgScope(ctx);
-    if (!scope) throw new Error("Non authentifié");
+    const scope = requireRole(await getOrgScope(ctx), "operator");
     const incident = await ctx.db.get("incidents", args.incidentId);
     if (!incident) throw new Error("Incident introuvable");
     if (incident.orgId !== scope.orgId) throw new Error("Accès refusé");
@@ -122,8 +121,7 @@ export const update = mutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const scope = await getOrgScope(ctx);
-    if (!scope) throw new Error("Non authentifié");
+    const scope = requireRole(await getOrgScope(ctx), "manager");
     const incident = await ctx.db.get("incidents", args.incidentId);
     if (!incident) throw new Error("Incident introuvable");
     if (incident.orgId !== scope.orgId) throw new Error("Accès refusé");

@@ -1,7 +1,8 @@
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
-import { internalMutation, query } from "./_generated/server";
+import { internalMutation, mutation, query } from "./_generated/server";
 import { roleSchema } from "./schema";
+import { getOrgScope, requireRole } from "./orgContext";
 import type { Id } from "./_generated/dataModel";
 
 export const DEFAULT_ORG_SLUG = "logistix";
@@ -84,5 +85,24 @@ export const currentUser = query({
       role: user.role,
       org,
     };
+  },
+});
+
+/**
+ * Met à jour le rôle d'un utilisateur de l'organisation.
+ * Réservé aux admins (requireRole "admin").
+ */
+export const updateUserRole = mutation({
+  args: {
+    userId: v.id("users"),
+    role: roleSchema,
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    requireRole(await getOrgScope(ctx), "admin");
+    const target = await ctx.db.get("users", args.userId);
+    if (!target) throw new Error("Utilisateur introuvable");
+    await ctx.db.patch("users", args.userId, { role: args.role });
+    return null;
   },
 });

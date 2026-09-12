@@ -5,6 +5,7 @@ import { useMutation } from 'convex/react'
 import { useState } from 'react'
 import { api } from '../../../convex/_generated/api'
 import { Field, Modal, NumberInput, Select, TextInput } from '../../components/form'
+import { can } from '../../components/rbac'
 import type { Id } from '../../../convex/_generated/dataModel'
 import type { FormEvent } from 'react'
 
@@ -29,11 +30,13 @@ type MockHub = {
 function HubCard({
   hub,
   real,
+  canManage,
   onToggle,
   onEdit,
 }: {
   hub: MockHub
   real: boolean
+  canManage: boolean
   onToggle?: () => void
   onEdit?: () => void
 }) {
@@ -85,7 +88,7 @@ function HubCard({
         {hub.lat.toFixed(4)}°, {hub.lng.toFixed(4)}°
       </div>
 
-      {real && onToggle && onEdit && (
+      {real && canManage && onToggle && onEdit && (
         <div style={{ display: 'flex', gap: '8px', marginTop: '12px', borderTop: '1px solid #1e2535', paddingTop: '12px' }}>
           <button type="button" className="btn btn-sm" onClick={onEdit}>Modifier</button>
           <button type="button" className={`btn btn-sm ${hub.isActive ? 'btn-danger' : ''}`} onClick={onToggle}>
@@ -100,11 +103,14 @@ function HubCard({
 function HubsPage() {
   const queryClient = useQueryClient()
   const { data: hubs } = useSuspenseQuery(convexQuery(api.hubs.list, {}))
+  const { data: currentUser } = useSuspenseQuery(convexQuery(api.organizations.currentUser, {}))
   const createHub = useMutation(api.hubs.create)
   const updateHub = useMutation(api.hubs.update)
+  const canManage = can(currentUser?.role, 'manager')
 
   const [showCreate, setShowCreate] = useState(false)
   const [editId, setEditId] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
   const emptyCreate = { name: '', code: '', city: '', country: 'France', capacity: '30000', currentLoad: '0', lat: '46.0', lng: '2.0', isActive: 'true' }
   const [createForm, setCreateForm] = useState(emptyCreate)
@@ -115,20 +121,25 @@ function HubsPage() {
   const submitCreate = async (e: FormEvent) => {
     e.preventDefault()
     if (!createForm.name.trim() || !createForm.code.trim() || !createForm.city.trim()) return
-    await createHub({
-      name: createForm.name.trim(),
-      code: createForm.code.trim().toUpperCase(),
-      city: createForm.city.trim(),
-      country: createForm.country.trim(),
-      capacity: Number(createForm.capacity) || 0,
-      currentLoad: Number(createForm.currentLoad) || 0,
-      lat: Number(createForm.lat) || 0,
-      lng: Number(createForm.lng) || 0,
-      isActive: createForm.isActive === 'true',
-    })
-    setCreateForm(emptyCreate)
-    setShowCreate(false)
-    refresh()
+    try {
+      await createHub({
+        name: createForm.name.trim(),
+        code: createForm.code.trim().toUpperCase(),
+        city: createForm.city.trim(),
+        country: createForm.country.trim(),
+        capacity: Number(createForm.capacity) || 0,
+        currentLoad: Number(createForm.currentLoad) || 0,
+        lat: Number(createForm.lat) || 0,
+        lng: Number(createForm.lng) || 0,
+        isActive: createForm.isActive === 'true',
+      })
+      setError(null)
+      setCreateForm(emptyCreate)
+      setShowCreate(false)
+      refresh()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Une erreur est survenue')
+    }
   }
 
   const openEdit = (hub: MockHub) => {
@@ -147,59 +158,72 @@ function HubsPage() {
   const submitEdit = async (e: FormEvent) => {
     e.preventDefault()
     if (!editId) return
-    await updateHub({
-      hubId: editId as Id<'hubs'>,
-      name: editForm.name.trim() || undefined,
-      city: editForm.city.trim() || undefined,
-      country: editForm.country.trim() || undefined,
-      capacity: Number(editForm.capacity) || undefined,
-      currentLoad: Number(editForm.currentLoad) || undefined,
-      lat: Number(editForm.lat) || undefined,
-      lng: Number(editForm.lng) || undefined,
-    })
-    setEditId(null)
-    refresh()
+    try {
+      await updateHub({
+        hubId: editId as Id<'hubs'>,
+        name: editForm.name.trim() || undefined,
+        city: editForm.city.trim() || undefined,
+        country: editForm.country.trim() || undefined,
+        capacity: Number(editForm.capacity) || undefined,
+        currentLoad: Number(editForm.currentLoad) || undefined,
+        lat: Number(editForm.lat) || undefined,
+        lng: Number(editForm.lng) || undefined,
+      })
+      setError(null)
+      setEditId(null)
+      refresh()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Une erreur est survenue')
+    }
   }
 
-  const toggleActive = (hub: MockHub) => {
-    updateHub({ hubId: hub._id as Id<'hubs'>, isActive: !hub.isActive })
-    refresh()
+  const toggleActive = async (hub: MockHub) => {
+    try {
+      await updateHub({ hubId: hub._id as Id<'hubs'>, isActive: !hub.isActive })
+      setError(null)
+      refresh()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Une erreur est survenue')
+    }
   }
-
-  const fallback = [
-    { _id: '1', name: 'Paris CDG', code: 'CDG', city: 'Paris', country: 'France', capacity: 50000, currentLoad: 44000, lat: 49.0097, lng: 2.5479, isActive: true },
-    { _id: '2', name: 'Lyon-Sud', code: 'LYS', city: 'Lyon', country: 'France', capacity: 35000, currentLoad: 32200, lat: 45.7256, lng: 4.8139, isActive: true },
-    { _id: '3', name: 'Marseille', code: 'MRS', city: 'Marseille', country: 'France', capacity: 40000, currentLoad: 24400, lat: 43.4393, lng: 5.2214, isActive: true },
-  ]
-  const display: Array<MockHub> = hubs.length > 0 ? hubs : fallback
-  const realHubs = hubs.length > 0
 
   return (
     <>
       <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
           <div className="page-title">Entrepôts</div>
-          <div className="page-sub">{realHubs ? display.filter((h) => h.isActive).length : 3} hubs actifs</div>
+          <div className="page-sub">{hubs.filter((h) => h.isActive).length} hubs actifs</div>
         </div>
-        <button className="btn btn-primary" onClick={() => {
-          setCreateForm(emptyCreate)
-          setShowCreate(true)
-        }}>
-          + Ajouter un hub
-        </button>
+        {canManage && (
+          <button className="btn btn-primary" onClick={() => {
+            setCreateForm(emptyCreate)
+            setShowCreate(true)
+          }}>
+            + Ajouter un hub
+          </button>
+        )}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '14px' }}>
-        {display.map((hub) => (
-          <HubCard
-            key={hub._id}
-            hub={hub}
-            real={!!realHubs}
-            onToggle={realHubs ? () => toggleActive(hub) : undefined}
-            onEdit={realHubs ? () => openEdit(hub) : undefined}
-          />
-        ))}
-      </div>
+      {error && <div className="auth-error">{error}</div>}
+
+      {hubs.length === 0 ? (
+        <div className="card">
+          <div className="empty-state">Aucun hub configuré. Ajoutez votre premier hub pour démarrer.</div>
+        </div>
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '14px' }}>
+          {hubs.map((hub) => (
+            <HubCard
+              key={hub._id}
+              hub={hub}
+              real
+              canManage={canManage}
+              onToggle={() => toggleActive(hub)}
+              onEdit={() => openEdit(hub)}
+            />
+          ))}
+        </div>
+      )}
 
       <div className="card" style={{ marginTop: '14px' }}>
         <div className="card-title">Carte du réseau</div>
@@ -257,6 +281,7 @@ function HubsPage() {
                 <option value="false">Inactif</option>
               </Select>
             </Field>
+            {error && <div className="auth-error">{error}</div>}
             <div className="modal-actions">
               <button type="button" className="btn" onClick={() => setShowCreate(false)}>Annuler</button>
               <button type="submit" className="btn btn-primary">Créer le hub</button>
@@ -295,6 +320,7 @@ function HubsPage() {
             <Field label="Longitude">
               <NumberInput step="any" value={editForm.lng} onChange={(e) => setEditForm({ ...editForm, lng: e.target.value })} />
             </Field>
+            {error && <div className="auth-error">{error}</div>}
             <div className="modal-actions">
               <button type="button" className="btn" onClick={() => setEditId(null)}>Annuler</button>
               <button type="submit" className="btn btn-primary">Enregistrer</button>

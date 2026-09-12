@@ -6,6 +6,7 @@ import { useState } from 'react'
 import { api } from '../../../convex/_generated/api'
 import { Field, Modal, Select, TextArea, TextInput } from '../../components/form'
 import { incidentTypeLabels, severityColors } from '../../components/shipmentMeta'
+import { can } from '../../components/rbac'
 import type { Id } from '../../../convex/_generated/dataModel'
 import type { FormEvent } from 'react'
 
@@ -23,9 +24,12 @@ const statusLabels: Record<string, string> = {
 function IncidentsPage() {
   const queryClient = useQueryClient()
   const { data: incidents } = useSuspenseQuery(convexQuery(api.incidents.list, {}))
+  const { data: currentUser } = useSuspenseQuery(convexQuery(api.organizations.currentUser, {}))
   const createIncident = useMutation(api.incidents.create)
   const resolveIncident = useMutation(api.incidents.resolve)
   const updateIncident = useMutation(api.incidents.update)
+  const canCreate = can(currentUser?.role, 'operator')
+  const canManage = can(currentUser?.role, 'manager')
 
   const [status, setStatus] = useState('all')
   const [severity, setSeverity] = useState('all')
@@ -36,6 +40,7 @@ function IncidentsPage() {
   const [showEdit, setShowEdit] = useState<string | null>(null)
   const [createForm, setCreateForm] = useState({ type: 'other', severity: 'medium', title: '', description: '' })
   const [editForm, setEditForm] = useState({ type: 'other', severity: 'medium', title: '', description: '', status: 'open' })
+  const [error, setError] = useState<string | null>(null)
 
   const refresh = () => queryClient.invalidateQueries()
 
@@ -61,15 +66,20 @@ function IncidentsPage() {
   const submitCreate = async (e: FormEvent) => {
     e.preventDefault()
     if (!createForm.title.trim()) return
-    await createIncident({
-      type: createForm.type as 'breakdown' | 'customs' | 'capacity' | 'delay' | 'damage' | 'other',
-      severity: createForm.severity as 'low' | 'medium' | 'high' | 'critical',
-      title: createForm.title.trim(),
-      description: createForm.description.trim(),
-    })
-    setCreateForm({ type: 'other', severity: 'medium', title: '', description: '' })
-    setShowCreate(false)
-    refresh()
+    try {
+      await createIncident({
+        type: createForm.type as 'breakdown' | 'customs' | 'capacity' | 'delay' | 'damage' | 'other',
+        severity: createForm.severity as 'low' | 'medium' | 'high' | 'critical',
+        title: createForm.title.trim(),
+        description: createForm.description.trim(),
+      })
+      setError(null)
+      setCreateForm({ type: 'other', severity: 'medium', title: '', description: '' })
+      setShowCreate(false)
+      refresh()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Une erreur est survenue')
+    }
   }
 
   const openEdit = (incidentId: string, current: { type: string; severity: string; title: string; description: string; status: string }) => {
@@ -86,21 +96,31 @@ function IncidentsPage() {
   const submitEdit = async (e: FormEvent) => {
     e.preventDefault()
     if (!showEdit) return
-    await updateIncident({
-      incidentId: showEdit as Id<'incidents'>,
-      type: editForm.type as 'breakdown' | 'customs' | 'capacity' | 'delay' | 'damage' | 'other',
-      severity: editForm.severity as 'low' | 'medium' | 'high' | 'critical',
-      title: editForm.title.trim(),
-      description: editForm.description.trim(),
-      status: editForm.status as 'open' | 'investigating' | 'resolved',
-    })
-    setShowEdit(null)
-    refresh()
+    try {
+      await updateIncident({
+        incidentId: showEdit as Id<'incidents'>,
+        type: editForm.type as 'breakdown' | 'customs' | 'capacity' | 'delay' | 'damage' | 'other',
+        severity: editForm.severity as 'low' | 'medium' | 'high' | 'critical',
+        title: editForm.title.trim(),
+        description: editForm.description.trim(),
+        status: editForm.status as 'open' | 'investigating' | 'resolved',
+      })
+      setError(null)
+      setShowEdit(null)
+      refresh()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Une erreur est survenue')
+    }
   }
 
   const doResolve = async (incidentId: Id<'incidents'>) => {
-    await resolveIncident({ incidentId })
-    refresh()
+    try {
+      await resolveIncident({ incidentId })
+      setError(null)
+      refresh()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Une erreur est survenue')
+    }
   }
 
   return (
@@ -110,13 +130,17 @@ function IncidentsPage() {
           <div className="page-title">Incidents</div>
           <div className="page-sub">{counts.open} ouverts · {counts.investigating} en cours · {counts.resolved} résolus</div>
         </div>
-        <button className="btn btn-primary" onClick={() => {
-          setCreateForm({ type: 'other', severity: 'medium', title: '', description: '' })
-          setShowCreate(true)
-        }}>
-          + Déclarer un incident
-        </button>
+        {canCreate && (
+          <button className="btn btn-primary" onClick={() => {
+            setCreateForm({ type: 'other', severity: 'medium', title: '', description: '' })
+            setShowCreate(true)
+          }}>
+            + Déclarer un incident
+          </button>
+        )}
       </div>
+
+      {error && <div className="auth-error">{error}</div>}
 
       <div className="toolbar">
         {[
@@ -193,20 +217,24 @@ function IncidentsPage() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'flex-end' }}>
                   {incident.status !== 'resolved' && (
                     <>
-                      <button
-                        type="button"
-                        className="btn btn-sm btn-danger"
-                        onClick={() => doResolve(incident._id)}
-                      >
-                        Résoudre
-                      </button>
-                      <button
-                        type="button"
-                        className="btn btn-sm"
-                        onClick={() => openEdit(incident._id, incident)}
-                      >
-                        Modifier
-                      </button>
+                      {canCreate && (
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-danger"
+                          onClick={() => doResolve(incident._id)}
+                        >
+                          Résoudre
+                        </button>
+                      )}
+                      {canManage && (
+                        <button
+                          type="button"
+                          className="btn btn-sm"
+                          onClick={() => openEdit(incident._id, incident)}
+                        >
+                          Modifier
+                        </button>
+                      )}
                     </>
                   )}
                 </div>
@@ -242,6 +270,7 @@ function IncidentsPage() {
             <Field label="Description">
               <TextArea placeholder="Détails de l'incident…" value={createForm.description} onChange={(e) => setCreateForm({ ...createForm, description: e.target.value })} />
             </Field>
+            {error && <div className="auth-error">{error}</div>}
             <div className="modal-actions">
               <button type="button" className="btn" onClick={() => setShowCreate(false)}>Annuler</button>
               <button type="submit" className="btn btn-primary" disabled={!createForm.title.trim()}>Déclarer</button>
@@ -283,6 +312,7 @@ function IncidentsPage() {
             <Field label="Description">
               <TextArea value={editForm.description} onChange={(e) => setEditForm({ ...editForm, description: e.target.value })} />
             </Field>
+            {error && <div className="auth-error">{error}</div>}
             <div className="modal-actions">
               <button type="button" className="btn" onClick={() => setShowEdit(null)}>Annuler</button>
               <button type="submit" className="btn btn-primary">Enregistrer</button>

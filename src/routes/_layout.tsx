@@ -4,6 +4,7 @@ import { useSuspenseQuery } from '@tanstack/react-query'
 import { convexQuery } from '@convex-dev/react-query'
 import { useEffect } from 'react'
 import { api } from '../../convex/_generated/api'
+import { roleLabel } from '../components/rbac'
 
 export const Route = createFileRoute('/_layout')({
   component: Layout,
@@ -54,8 +55,21 @@ function Layout() {
             Live sync
           </div>
           <div style={{ fontSize: '12px', fontFamily: "'DM Mono', monospace", color: '#3d4a5c' }}>
-            Mar 12, 2026
+            {new Date().toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })}
           </div>
+          <span
+            style={{
+              fontSize: '10px',
+              fontFamily: "'DM Mono', monospace",
+              padding: '3px 8px',
+              borderRadius: '10px',
+              background: '#3b82f614',
+              color: '#3b82f6',
+              border: '1px solid #3b82f633',
+            }}
+          >
+            {roleLabel(currentUser?.role)}
+          </span>
           <div className="avatar" title={currentUser?.name}>
             {initials}
           </div>

@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
-import { getOrgScope } from "./orgContext";
+import { getOrgScope, requireRole } from "./orgContext";
 import { recordTrackingEvent } from "./tracking";
 import type { Id } from "./_generated/dataModel";
 
@@ -27,6 +27,7 @@ const shipmentFields = v.object({
   actualDelivery: v.optional(v.number()),
   createdAt: v.number(),
   updatedAt: v.optional(v.number()),
+  orgId: v.optional(v.id("organizations")),
 });
 
 export const list = query({
@@ -208,8 +209,7 @@ export const create = mutation({
   },
   returns: v.id("shipments"),
   handler: async (ctx, args) => {
-    const scope = await getOrgScope(ctx);
-    if (!scope) throw new Error("Non authentifié");
+    const scope = requireRole(await getOrgScope(ctx), "operator");
     const reference = `EX-${String(Date.now() % 100000).padStart(5, '0')}`;
     return await ctx.db.insert("shipments", {
       reference,
@@ -242,8 +242,7 @@ export const updateStatus = mutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const scope = await getOrgScope(ctx);
-    if (!scope) throw new Error("Non authentifié");
+    const scope = requireRole(await getOrgScope(ctx), "operator");
     const shipment = await ctx.db.get("shipments", args.shipmentId);
     if (!shipment) throw new Error("Expédition introuvable");
     if (shipment.orgId !== scope.orgId) throw new Error("Accès refusé");
@@ -293,8 +292,7 @@ export const update = mutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const scope = await getOrgScope(ctx);
-    if (!scope) throw new Error("Non authentifié");
+    const scope = requireRole(await getOrgScope(ctx), "operator");
     const shipment = await ctx.db.get("shipments", args.shipmentId);
     if (!shipment) throw new Error("Expédition introuvable");
     if (shipment.orgId !== scope.orgId) throw new Error("Accès refusé");

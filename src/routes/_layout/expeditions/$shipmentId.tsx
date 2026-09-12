@@ -14,6 +14,7 @@ import {
   statusClasses,
   statusLabels,
 } from '../../../components/shipmentMeta'
+import { can } from '../../../components/rbac'
 import type { Id } from '../../../../convex/_generated/dataModel'
 import type { FormEvent } from 'react'
 
@@ -40,14 +41,17 @@ function ShipmentDetailPage() {
   const { data: events } = useSuspenseQuery(
     convexQuery(api.tracking.listByShipment, { shipmentId: shipmentId as Id<'shipments'> }),
   )
+  const { data: currentUser } = useSuspenseQuery(convexQuery(api.organizations.currentUser, {}))
   const updateStatus = useMutation(api.shipments.updateStatus)
   const updateShipment = useMutation(api.shipments.update)
   const logEvent = useMutation(api.tracking.log)
+  const canEdit = can(currentUser?.role, 'operator')
 
   const [showEdit, setShowEdit] = useState(false)
   const [showEvent, setShowEvent] = useState(false)
   const [editForm, setEditForm] = useState({ weight: '', priority: 'normal', customerName: '', customerRef: '', estimatedDelivery: '' })
   const [eventForm, setEventForm] = useState({ eventType: 'custom', description: '', location: '' })
+  const [error, setError] = useState<string | null>(null)
 
   if (!data) {
     return (
@@ -65,8 +69,13 @@ function ShipmentDetailPage() {
   const refresh = () => queryClient.invalidateQueries()
 
   const changeStatus = async (status: string) => {
-    await updateStatus({ shipmentId: shipment._id, status: status as typeof statusSteps[number] })
-    refresh()
+    try {
+      await updateStatus({ shipmentId: shipment._id, status: status as typeof statusSteps[number] })
+      setError(null)
+      refresh()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Une erreur est survenue')
+    }
   }
 
   const openEdit = () => {
@@ -84,31 +93,41 @@ function ShipmentDetailPage() {
 
   const submitEdit = async (e: FormEvent) => {
     e.preventDefault()
-    await updateShipment({
-      shipmentId: shipment._id,
-      weight: Number(editForm.weight) || undefined,
-      priority: editForm.priority as 'low' | 'normal' | 'high' | 'urgent',
-      customerName: editForm.customerName.trim() || undefined,
-      customerRef: editForm.customerRef.trim() || null,
-      estimatedDelivery: editForm.estimatedDelivery
-        ? new Date(editForm.estimatedDelivery).getTime()
-        : null,
-    })
-    setShowEdit(false)
-    refresh()
+    try {
+      await updateShipment({
+        shipmentId: shipment._id,
+        weight: Number(editForm.weight) || undefined,
+        priority: editForm.priority as 'low' | 'normal' | 'high' | 'urgent',
+        customerName: editForm.customerName.trim() || undefined,
+        customerRef: editForm.customerRef.trim() || null,
+        estimatedDelivery: editForm.estimatedDelivery
+          ? new Date(editForm.estimatedDelivery).getTime()
+          : null,
+      })
+      setError(null)
+      setShowEdit(false)
+      refresh()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Une erreur est survenue')
+    }
   }
 
   const submitEvent = async (e: FormEvent) => {
     e.preventDefault()
-    await logEvent({
-      shipmentId: shipment._id,
-      eventType: eventForm.eventType as 'created' | 'processed' | 'in_transit' | 'delayed' | 'delivered' | 'cancelled' | 'custom',
-      description: eventForm.description.trim(),
-      location: eventForm.location.trim() || undefined,
-    })
-    setEventForm({ eventType: 'custom', description: '', location: '' })
-    setShowEvent(false)
-    refresh()
+    try {
+      await logEvent({
+        shipmentId: shipment._id,
+        eventType: eventForm.eventType as 'created' | 'processed' | 'in_transit' | 'delayed' | 'delivered' | 'cancelled' | 'custom',
+        description: eventForm.description.trim(),
+        location: eventForm.location.trim() || undefined,
+      })
+      setError(null)
+      setEventForm({ eventType: 'custom', description: '', location: '' })
+      setShowEvent(false)
+      refresh()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Une erreur est survenue')
+    }
   }
 
   const priorityColor = priorityColors[shipment.priority] || '#6b7a99'
@@ -142,8 +161,10 @@ function ShipmentDetailPage() {
             {fromHub.city} → {toHub.city} · {shipment.weight.toLocaleString()} kg
           </div>
         </div>
-        <button className="btn" onClick={openEdit}>Modifier</button>
+        {canEdit && <button className="btn" onClick={openEdit}>Modifier</button>}
       </div>
+
+      {error && <div className="auth-error">{error}</div>}
 
       <div className="detail-grid">
         <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
@@ -185,30 +206,34 @@ function ShipmentDetailPage() {
             </div>
           </div>
 
-          <div className="card">
-            <div className="card-title">Mise à jour du statut</div>
-            <div className="seg" style={{ flexWrap: 'wrap' }}>
-              {statusSteps.map((step) => (
-                <button
-                  key={step}
-                  type="button"
-                  className={`seg-btn ${shipment.status === step ? 'active' : ''}`}
-                  onClick={() => changeStatus(step)}
-                >
-                  {statusLabels[step]}
-                </button>
-              ))}
+          {canEdit && (
+            <div className="card">
+              <div className="card-title">Mise à jour du statut</div>
+              <div className="seg" style={{ flexWrap: 'wrap' }}>
+                {statusSteps.map((step) => (
+                  <button
+                    key={step}
+                    type="button"
+                    className={`seg-btn ${shipment.status === step ? 'active' : ''}`}
+                    onClick={() => changeStatus(step)}
+                  >
+                    {statusLabels[step]}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
         <div className="card">
           <div className="card-title" style={{ marginBottom: '10px' }}>
             Suivi en temps réel <span className="card-tag">{events.length} événements</span>
           </div>
-          <button type="button" className="btn btn-sm btn-primary" style={{ marginBottom: '14px' }} onClick={() => setShowEvent(true)}>
-            + Ajouter un point de suivi
-          </button>
+          {canEdit && (
+            <button type="button" className="btn btn-sm btn-primary" style={{ marginBottom: '14px' }} onClick={() => setShowEvent(true)}>
+              + Ajouter un point de suivi
+            </button>
+          )}
           {events.length > 0 ? (
             <div className="timeline">
               {events.map((event) => (
@@ -260,6 +285,7 @@ function ShipmentDetailPage() {
                 <TextInput type="datetime-local" value={editForm.estimatedDelivery} onChange={(e) => setEditForm({ ...editForm, estimatedDelivery: e.target.value })} />
               </Field>
             </div>
+            {error && <div className="auth-error">{error}</div>}
             <div className="modal-actions">
               <button type="button" className="btn" onClick={() => setShowEdit(false)}>Annuler</button>
               <button type="submit" className="btn btn-primary">Enregistrer</button>
@@ -290,6 +316,7 @@ function ShipmentDetailPage() {
             <Field label="Description">
               <TextArea placeholder="Détail de l'événement…" value={eventForm.description} onChange={(e) => setEventForm({ ...eventForm, description: e.target.value })} />
             </Field>
+            {error && <div className="auth-error">{error}</div>}
             <div className="modal-actions">
               <button type="button" className="btn" onClick={() => setShowEvent(false)}>Annuler</button>
               <button type="submit" className="btn btn-primary" disabled={!eventForm.description.trim()}>Ajouter</button>

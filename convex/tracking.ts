@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
-import { getOrgScope } from "./orgContext";
+import { getOrgScope, requireRole } from "./orgContext";
 import type { MutationCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 
@@ -30,6 +30,7 @@ const eventFields = v.object({
   eventType: eventTypeSchema,
   description: v.string(),
   location: v.optional(v.string()),
+  orgId: v.optional(v.id("organizations")),
 });
 
 /**
@@ -80,8 +81,7 @@ export const log = mutation({
   },
   returns: v.id("trackingEvents"),
   handler: async (ctx, args) => {
-    const scope = await getOrgScope(ctx);
-    if (!scope) throw new Error("Non authentifié");
+    const scope = requireRole(await getOrgScope(ctx), "operator");
     const shipment = await ctx.db.get("shipments", args.shipmentId);
     if (!shipment) throw new Error("Expédition introuvable");
     if (shipment.orgId !== scope.orgId) throw new Error("Accès refusé");

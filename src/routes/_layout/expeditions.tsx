@@ -11,6 +11,7 @@ import {
   statusClasses,
   statusLabels,
 } from '../../components/shipmentMeta'
+import { can } from '../../components/rbac'
 import type { Id } from '../../../convex/_generated/dataModel'
 import type { FormEvent } from 'react'
 
@@ -34,7 +35,9 @@ function ShipmentsPage() {
   const queryClient = useQueryClient()
   const { data: shipments } = useSuspenseQuery(convexQuery(api.shipments.list, {}))
   const { data: hubs } = useSuspenseQuery(convexQuery(api.hubs.list, {}))
+  const { data: currentUser } = useSuspenseQuery(convexQuery(api.organizations.currentUser, {}))
   const createShipment = useMutation(api.shipments.create)
+  const canCreate = can(currentUser?.role, 'operator')
 
   const [status, setStatus] = useState('all')
   const [priority, setPriority] = useState('all')
@@ -44,6 +47,7 @@ function ShipmentsPage() {
   const [showCreate, setShowCreate] = useState(false)
   const [form, setForm] = useState(emptyForm)
   const [creating, setCreating] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const defaultHubs = hubs.length
     ? hubs[0]._id
@@ -89,21 +93,27 @@ function ShipmentsPage() {
     e.preventDefault()
     if (!form.fromHubId || !form.toHubId || !form.customerName.trim()) return
     setCreating(true)
-    await createShipment({
-      fromHubId: form.fromHubId as Id<'hubs'>,
-      toHubId: form.toHubId as Id<'hubs'>,
-      weight: Number(form.weight) || 0,
-      priority: form.priority as 'low' | 'normal' | 'high' | 'urgent',
-      customerName: form.customerName.trim(),
-      customerRef: form.customerRef.trim() || undefined,
-      estimatedDelivery: form.estimatedDelivery
-        ? new Date(form.estimatedDelivery).getTime()
-        : undefined,
-    })
-    queryClient.invalidateQueries()
-    setCreating(false)
-    setShowCreate(false)
-    setForm({ ...emptyForm, fromHubId: defaultHubs })
+    try {
+      await createShipment({
+        fromHubId: form.fromHubId as Id<'hubs'>,
+        toHubId: form.toHubId as Id<'hubs'>,
+        weight: Number(form.weight) || 0,
+        priority: form.priority as 'low' | 'normal' | 'high' | 'urgent',
+        customerName: form.customerName.trim(),
+        customerRef: form.customerRef.trim() || undefined,
+        estimatedDelivery: form.estimatedDelivery
+          ? new Date(form.estimatedDelivery).getTime()
+          : undefined,
+      })
+      setError(null)
+      queryClient.invalidateQueries()
+      setCreating(false)
+      setShowCreate(false)
+      setForm({ ...emptyForm, fromHubId: defaultHubs })
+    } catch (err) {
+      setCreating(false)
+      setError(err instanceof Error ? err.message : 'Une erreur est survenue')
+    }
   }
 
   return (
@@ -113,12 +123,14 @@ function ShipmentsPage() {
           <div className="page-title">Expéditions</div>
           <div className="page-sub">{counts.all} expéditions · {counts.in_transit} en transit</div>
         </div>
-        <button className="btn btn-primary" onClick={() => {
-          setForm({ ...emptyForm, fromHubId: defaultHubs, toHubId: defaultHubs })
-          setShowCreate(true)
-        }}>
-          + Nouvelle expédition
-        </button>
+        {canCreate && (
+          <button className="btn btn-primary" onClick={() => {
+            setForm({ ...emptyForm, fromHubId: defaultHubs, toHubId: defaultHubs })
+            setShowCreate(true)
+          }}>
+            + Nouvelle expédition
+          </button>
+        )}
       </div>
 
       <div className="toolbar">
@@ -324,6 +336,7 @@ function ShipmentsPage() {
                 Aucun hub disponible : lancez la commande seed pour initialiser l'organisation.
               </div>
             )}
+            {error && <div className="auth-error">{error}</div>}
             <div className="modal-actions">
               <button type="button" className="btn" onClick={() => setShowCreate(false)}>Annuler</button>
               <button type="submit" className="btn btn-primary" disabled={creating || !hasHubs}>

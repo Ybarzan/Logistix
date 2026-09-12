@@ -6,6 +6,41 @@
 
 ---
 
+## 0. Session 5 — Industrialisation (RBAC, automatisation, tests, dépôt Git)
+
+> Objectif : transformer le prototype en socle produit. Dépôt Git créé, RBAC serveur + frontend, automatisation par cron, premiers tests, correction d'un bug critique de validateurs.
+
+### Dépôt Git
+- **Dépôt créé** : `https://github.com/Ybarzan/Logistix.git` (branche `main`, commit initial `bc348be`).
+- `.gitignore` complété : ajout de `.tmp-convex`. `.env.local` (clé admin) jamais commité.
+
+### RBAC (contrôle d'accès par rôle)
+- **Backend** (`convex/orgContext.ts`) : type `Role` (admin > manager > operator > viewer), `OrgScope` étendu avec `role`, helper `requireRole(scope, minRole)` avec hiérarchie d'héritage. Compte sans rôle → `viewer` (moindre privilège, fail-safe).
+- **Matrice appliquée** : viewer = lecture seule ; operator = shipments (create/update/updateStatus) + tracking.log + incidents (create/resolve) ; manager = operator + hubs/routes (create/update) + incidents.update ; admin = tout + `organizations.updateUserRole` (nouvelle mutation).
+- **Frontend** (`src/components/rbac.ts`) : helper `can(role, minRole)` + `roleLabel()`, badge de rôle dans la topbar, gating des actions par page (boutons masqués selon le rôle), try/catch sur toutes les mutations (message `.auth-error`).
+
+### Automatisation (jobs schedulés)
+- **`convex/automation.ts`** (nouveau) : détection automatique des retards d'expédition (statuts pending/loading/in_transit avec `estimatedDelivery` dépassée) et des surcharges de hubs (> 90% capacité). Sévérité selon la durée de dépassement (< 12h low, 12-24h medium, 24-48h high, > 48h critical). Anti-doublon : pas de nouvel incident tant qu'un incident ouvert (open/investigating) existe pour la même expédition/hub.
+- **`convex/crons.ts`** (nouveau) : cron toutes les 15 min → `internal.automation.runAutomation`.
+
+### Tests (premiers)
+- **`convex/test/`** : 26 tests (17 unitaires + 9 intégration backend) via `node:test` + `tsx`. Couvre : `requireRole` (hiérarchie), `getOrgScope` (fail-safe viewer), `severityForDelay` (seuils), `formatOverrun` (formatage), flux expédition complet (création → statuts → événements tracking) + RBAC (refus sans auth).
+- **Script npm** : `npm test` → `tsx --test "convex/test/*.test.ts"`.
+
+### Bug critique corrigé
+- **Validateurs `returns` incomplets** : `shipments.list`, `incidents.list`, `hubs.list`, `routes.list`, `tracking.listByShipment`, `shipments.getById` renvoyaient les documents complets (avec `orgId`) mais leurs validateurs omettaient `orgId` → `ReturnsValidationError` au runtime. **Toutes les pages de données étaient cassées** (jamais détecté : la QA navigateur n'avait pas eu lieu). Corrigé en ajoutant `orgId: v.optional(v.id("organizations"))` aux 5 validateurs.
+
+### État final
+- `npm run lint` : **0 erreur** · `npm run build` : **OK** · `npm test` : **26/26 passent**.
+
+### À faire (reste)
+1. **QA navigateur** : vérifier les pages avec le backend up (les validateurs corrigés doivent débloquer les données).
+2. **Nettoyage des données de test** : ajouter des mutations de suppression (deleteShipment/deleteHub) pour que les tests d'intégration puissent nettoyer.
+3. **Vérifier le cron en prod** : les incidents auto doivent apparaître toutes les 15 min sans doublon.
+4. Backlog : actions (jobs schedulés), export PDF, authentification par code, gestion des utilisateurs/rôles dans l'UI (updateUserRole est prêt côté API).
+
+---
+
 ## 1. Vue d'ensemble du projet
 
 - **Backend** : Convex (base, requêtes, mutations, actions, auth par mot de passe).

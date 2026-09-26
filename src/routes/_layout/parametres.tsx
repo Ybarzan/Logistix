@@ -181,6 +181,8 @@ function SettingsPage() {
       </div>
 
       <FleethubCard isAdmin={isAdmin} canSync={can(currentUser?.role, 'operator')} />
+      <FleetMarketCard isAdmin={isAdmin} />
+      <Co2Card isAdmin={isAdmin} />
 
       {isAdmin && invitations.length > 0 && (
         <div className="card" style={{ marginTop: '14px' }}>
@@ -297,6 +299,121 @@ function FleethubCard({ isAdmin, canSync }: { isAdmin: boolean; canSync: boolean
         </div>
       )}
       {!config && !isAdmin && <div className="empty-state">Non configurée. Demandez à un administrateur.</div>}
+    </div>
+  )
+}
+
+function FleetMarketCard({ isAdmin }: { isAdmin: boolean }) {
+  const { data: config } = useSuspenseQuery(convexQuery(api.fleetmarket.getConfig, {}))
+  const save = useMutation(api.fleetmarket.saveConfig)
+  const [form, setForm] = useState({
+    baseUrl: config?.baseUrl ?? 'http://host.docker.internal:8091',
+    apiKey: '',
+    enabled: config?.enabled ?? true,
+  })
+  const [error, setError] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+
+  const submit = async (e: FormEvent) => {
+    e.preventDefault()
+    setBusy(true)
+    setError(null)
+    try {
+      await save({ baseUrl: form.baseUrl, enabled: form.enabled, ...(form.apiKey.trim() ? { apiKey: form.apiKey.trim() } : {}) })
+      setForm({ ...form, apiKey: '' })
+    } catch (err) {
+      setError(errorMessage(err))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="card" style={{ marginTop: '14px' }}>
+      <div className="card-title">
+        Intégration FleetMarket <span className="card-tag">capacité de secours</span>
+      </div>
+      <div className="page-sub" style={{ marginBottom: '12px' }}>
+        Publiez une expédition en difficulté auprès de transporteurs vérifiés, choisissez la proposition depuis LogistiX,
+        puis suivez le camion retenu en GPS. Clé API : FleetMarket → Tableau de bord → « Intégrations (clé API) ».
+      </div>
+      {error && <div className="auth-error">{error}</div>}
+      {isAdmin ? (
+        <form onSubmit={submit}>
+          <div className="field-row">
+            <Field label="URL FleetMarket (API)">
+              <TextInput value={form.baseUrl} onChange={(e) => setForm({ ...form, baseUrl: e.target.value })} />
+            </Field>
+            <Field label={config ? `Clé API (actuelle ${config.keyHint})` : 'Clé API donneur d’ordre'}>
+              <input
+                className="input"
+                type="password"
+                autoComplete="off"
+                placeholder={config ? 'Laisser vide pour conserver' : 'fm_…'}
+                value={form.apiKey}
+                onChange={(e) => setForm({ ...form, apiKey: e.target.value })}
+              />
+            </Field>
+          </div>
+          <label className="field-label" style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '12px' }}>
+            <input type="checkbox" checked={form.enabled} onChange={(e) => setForm({ ...form, enabled: e.target.checked })} />
+            Intégration active
+          </label>
+          <button type="submit" className="btn btn-primary" disabled={busy}>Enregistrer</button>
+        </form>
+      ) : (
+        !config && <div className="empty-state">Non configurée. Demandez à un administrateur.</div>
+      )}
+      {config && (
+        <div className="status-line">
+          {config.enabled ? 'Active' : 'Désactivée'} · dernière synchro : {config.lastSyncAt ? formatDateTime(config.lastSyncAt) : 'jamais'}
+          {config.lastError && <><br /><span className="err">Erreur : {config.lastError}</span></>}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function Co2Card({ isAdmin }: { isAdmin: boolean }) {
+  const { data: summary } = useSuspenseQuery(convexQuery(api.co2.summary, {}))
+  const setFactor = useMutation(api.co2.setFactor)
+  const [value, setValue] = useState(summary.isDefaultFactor ? '' : String(summary.factor))
+  const [error, setError] = useState<string | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
+
+  const submit = async (e: FormEvent) => {
+    e.preventDefault()
+    setError(null)
+    setNotice(null)
+    try {
+      await setFactor({ factorKgPerTkm: value.trim() ? Number(value.replace(',', '.')) : null })
+      setNotice(value.trim() ? 'Facteur enregistré.' : 'Facteur par défaut rétabli.')
+    } catch (err) {
+      setError(errorMessage(err))
+    }
+  }
+
+  return (
+    <div className="card" style={{ marginTop: '14px' }}>
+      <div className="card-title">
+        Estimation CO₂e <span className="card-tag">t·km × facteur</span>
+      </div>
+      <div className="page-sub" style={{ marginBottom: '12px' }}>
+        Facteur actuel : {summary.factor} kg CO₂e par tonne·km
+        {summary.isDefaultFactor
+          ? ' — valeur indicative par défaut (ordre de grandeur poids lourd 40 t, puits-à-roue). Remplacez-la par celle de votre transporteur ou de la Base Carbone ADEME pour votre véhicule.'
+          : ' — facteur propre à votre organisation.'}
+      </div>
+      {error && <div className="auth-error">{error}</div>}
+      {notice && <div className="notice">{notice}</div>}
+      {isAdmin && (
+        <form onSubmit={submit} style={{ display: 'flex', gap: '8px', alignItems: 'flex-end' }}>
+          <Field label="Facteur (kg CO₂e / t·km) — vide = défaut">
+            <TextInput inputMode="decimal" value={value} onChange={(e) => setValue(e.target.value)} />
+          </Field>
+          <button type="submit" className="btn btn-primary" style={{ marginBottom: '12px' }}>Enregistrer</button>
+        </form>
+      )}
     </div>
   )
 }

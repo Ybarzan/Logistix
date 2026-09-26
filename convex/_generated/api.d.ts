@@ -10,13 +10,17 @@
 
 import type * as auth from "../auth.js";
 import type * as automation from "../automation.js";
+import type * as co2 from "../co2.js";
 import type * as crons from "../crons.js";
 import type * as fleethub from "../fleethub.js";
+import type * as fleetmarket from "../fleetmarket.js";
 import type * as http from "../http.js";
 import type * as hubs from "../hubs.js";
 import type * as incidents from "../incidents.js";
 import type * as orgContext from "../orgContext.js";
 import type * as organizations from "../organizations.js";
+import type * as publicTracking from "../publicTracking.js";
+import type * as recommendations from "../recommendations.js";
 import type * as routes from "../routes.js";
 import type * as seed from "../seed.js";
 import type * as shipmentStatus from "../shipmentStatus.js";
@@ -34,13 +38,17 @@ import type {
 declare const fullApi: ApiFromModules<{
   auth: typeof auth;
   automation: typeof automation;
+  co2: typeof co2;
   crons: typeof crons;
   fleethub: typeof fleethub;
+  fleetmarket: typeof fleetmarket;
   http: typeof http;
   hubs: typeof hubs;
   incidents: typeof incidents;
   orgContext: typeof orgContext;
   organizations: typeof organizations;
+  publicTracking: typeof publicTracking;
+  recommendations: typeof recommendations;
   routes: typeof routes;
   seed: typeof seed;
   shipmentStatus: typeof shipmentStatus;

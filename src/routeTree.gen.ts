@@ -19,6 +19,7 @@ import { Route as LayoutPerformanceRouteImport } from './routes/_layout/performa
 import { Route as LayoutRoutesRouteImport } from './routes/_layout/routes'
 import { Route as LayoutSlaRouteImport } from './routes/_layout/sla'
 import { Route as LayoutTracabiliteRouteImport } from './routes/_layout/tracabilite'
+import { Route as SuiviTokenRouteImport } from './routes/suivi.$token'
 import { Route as LayoutExpeditionsIndexRouteImport } from './routes/_layout/expeditions/index'
 import { Route as LayoutExpeditionsShipmentIdRouteImport } from './routes/_layout/expeditions/$shipmentId'
 
@@ -71,6 +72,11 @@ const LayoutTracabiliteRoute = LayoutTracabiliteRouteImport.update({
   path: '/tracabilite',
   getParentRoute: () => LayoutRoute,
 } as any)
+const SuiviTokenRoute = SuiviTokenRouteImport.update({
+  id: '/suivi/$token',
+  path: '/suivi/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LayoutExpeditionsIndexRoute = LayoutExpeditionsIndexRouteImport.update({
   id: '/expeditions/',
   path: '/expeditions/',
@@ -93,6 +99,7 @@ export interface FileRoutesByFullPath {
   '/routes': typeof LayoutRoutesRoute
   '/sla': typeof LayoutSlaRoute
   '/tracabilite': typeof LayoutTracabiliteRoute
+  '/suivi/$token': typeof SuiviTokenRoute
   '/expeditions/$shipmentId': typeof LayoutExpeditionsShipmentIdRoute
   '/expeditions/': typeof LayoutExpeditionsIndexRoute
 }
@@ -105,6 +112,7 @@ export interface FileRoutesByTo {
   '/routes': typeof LayoutRoutesRoute
   '/sla': typeof LayoutSlaRoute
   '/tracabilite': typeof LayoutTracabiliteRoute
+  '/suivi/$token': typeof SuiviTokenRoute
   '/': typeof LayoutIndexRoute
   '/expeditions/$shipmentId': typeof LayoutExpeditionsShipmentIdRoute
   '/expeditions': typeof LayoutExpeditionsIndexRoute
@@ -120,6 +128,7 @@ export interface FileRoutesById {
   '/_layout/routes': typeof LayoutRoutesRoute
   '/_layout/sla': typeof LayoutSlaRoute
   '/_layout/tracabilite': typeof LayoutTracabiliteRoute
+  '/suivi/$token': typeof SuiviTokenRoute
   '/_layout/': typeof LayoutIndexRoute
   '/_layout/expeditions/$shipmentId': typeof LayoutExpeditionsShipmentIdRoute
   '/_layout/expeditions/': typeof LayoutExpeditionsIndexRoute
@@ -136,6 +145,7 @@ export interface FileRouteTypes {
     | '/routes'
     | '/sla'
     | '/tracabilite'
+    | '/suivi/$token'
     | '/expeditions/$shipmentId'
     | '/expeditions/'
   fileRoutesByTo: FileRoutesByTo
@@ -148,6 +158,7 @@ export interface FileRouteTypes {
     | '/routes'
     | '/sla'
     | '/tracabilite'
+    | '/suivi/$token'
     | '/'
     | '/expeditions/$shipmentId'
     | '/expeditions'
@@ -162,6 +173,7 @@ export interface FileRouteTypes {
     | '/_layout/routes'
     | '/_layout/sla'
     | '/_layout/tracabilite'
+    | '/suivi/$token'
     | '/_layout/'
     | '/_layout/expeditions/$shipmentId'
     | '/_layout/expeditions/'
@@ -170,6 +182,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   LayoutRoute: typeof LayoutRouteWithChildren
   LoginRoute: typeof LoginRoute
+  SuiviTokenRoute: typeof SuiviTokenRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -244,6 +257,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LayoutTracabiliteRouteImport
       parentRoute: typeof LayoutRoute
     }
+    '/suivi/$token': {
+      id: '/suivi/$token'
+      path: '/suivi/$token'
+      fullPath: '/suivi/$token'
+      preLoaderRoute: typeof SuiviTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_layout/expeditions/': {
       id: '/_layout/expeditions/'
       path: '/expeditions'
@@ -293,6 +313,7 @@ const LayoutRouteWithChildren =
 const rootRouteChildren: RootRouteChildren = {
   LayoutRoute: LayoutRouteWithChildren,
   LoginRoute: LoginRoute,
+  SuiviTokenRoute: SuiviTokenRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

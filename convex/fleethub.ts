@@ -28,7 +28,7 @@ const MIN_PING_INTERVAL_MS = 10 * 60 * 1000;
 
 const HTTP_TIMEOUT_MS = 8000;
 
-function normalizeBaseUrl(raw: string): string {
+export function normalizeBaseUrl(raw: string): string {
   const url = raw.trim().replace(/\/+$/, "");
   if (!/^https?:\/\/[^\s]+$/.test(url)) {
     throw new Error("URL fleet-hub invalide (http(s)://…)");
@@ -291,7 +291,11 @@ export const applySyncResult = internalMutation({
   },
 });
 
-async function recordPosition(
+/**
+ * Enregistre une mesure GPS sur une expédition (dernière position + trace).
+ * Partagé par les deux sources : fleet-hub direct et tunnel FleetMarket.
+ */
+export async function recordPosition(
   ctx: Parameters<typeof recordTrackingEvent>[0],
   orgId: Id<"organizations">,
   p: { shipmentId: Id<"shipments">; lat: number; lng: number; speedKph?: number; recordedAt: number },

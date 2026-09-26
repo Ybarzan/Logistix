@@ -3,7 +3,7 @@ import { mutation, query } from "./_generated/server";
 import { getOrgScope, requireOwned, requireRole } from "./orgContext";
 import { recordTrackingEvent } from "./tracking";
 import { canTransition, formatShipmentReference, isTerminal } from "./shipmentStatus";
-import { positionSchema } from "./schema";
+import { fleetmarketLinkSchema, positionSchema } from "./schema";
 import type { ShipmentStatus } from "./shipmentStatus";
 import type { MutationCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
@@ -42,6 +42,8 @@ const shipmentFields = v.object({
   updatedAt: v.optional(v.number()),
   truckRegistration: v.optional(v.string()),
   lastPosition: v.optional(positionSchema),
+  fleetmarket: v.optional(fleetmarketLinkSchema),
+  trackingToken: v.optional(v.string()),
   orgId: v.optional(v.id("organizations")),
 });
 

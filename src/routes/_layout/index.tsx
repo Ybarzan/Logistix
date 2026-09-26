@@ -3,6 +3,8 @@ import { useSuspenseQuery } from '@tanstack/react-query'
 import { convexQuery } from '@convex-dev/react-query'
 import { api } from '../../../convex/_generated/api'
 import { eventColors, formatDateTime } from '../../components/shipmentMeta'
+import { RecommendedActions } from '../../components/RecommendedActions'
+import { can } from '../../components/rbac'
 
 export const Route = createFileRoute('/_layout/')({
   head: () => ({ meta: [{ title: 'Vue d\'ensemble — Logistix' }] }),
@@ -14,6 +16,10 @@ function Dashboard() {
   const { data: shipments } = useSuspenseQuery(convexQuery(api.shipments.list, { limit: 5 }))
   const { data: incidents } = useSuspenseQuery(convexQuery(api.incidents.list, { status: "open" }))
   const { data: recentEvents } = useSuspenseQuery(convexQuery(api.tracking.recent, { limit: 5 }))
+  const { data: actions } = useSuspenseQuery(convexQuery(api.recommendations.openActions, { limit: 20 }))
+  const { data: co2 } = useSuspenseQuery(convexQuery(api.co2.summary, {}))
+  const { data: currentUser } = useSuspenseQuery(convexQuery(api.organizations.currentUser, {}))
+  const canAct = can(currentUser?.role, 'operator')
 
   const statusLabels: Record<string, string> = {
     pending: 'En attente',
@@ -95,20 +101,25 @@ function Dashboard() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
           <div className="card">
             <div className="card-title">
-              Alertes critiques <span className="card-tag">{incidents.length} ouvertes</span>
+              À traiter maintenant <span className="card-tag">{actions.length} incident(s)</span>
             </div>
-            {incidents.length === 0 ? (
-              <div className="empty-state">Aucune alerte ouverte.</div>
+            {actions.length === 0 ? (
+              <div className="empty-state">Rien à traiter : aucun incident ouvert.</div>
             ) : (
               <div className="alert-list">
-                {incidents.map((a) => (
-                  <div key={a._id} className={`alert-item ${a.severity === 'critical' ? 'danger' : a.severity === 'high' ? 'warn' : 'info'}`}>
-                    <div className={`alert-dot ${a.severity === 'critical' ? 'danger' : a.severity === 'high' ? 'warn' : 'info'}`} />
-                    <div className="alert-text">
-                      <strong>{a.title}</strong> — {a.description}
+                {actions.slice(0, 5).map((a) => {
+                  const tone = a.severity === 'critical' ? 'danger' : a.severity === 'high' ? 'warn' : 'info'
+                  return (
+                    <div key={a.incidentId} className={`alert-item ${tone}`} style={{ flexWrap: 'wrap' }}>
+                      <div className={`alert-dot ${tone}`} />
+                      <div className="alert-text" style={{ flex: 1 }}>
+                        <strong>{a.title}</strong>
+                        {a.shipmentRef ? <span className="mono"> · {a.shipmentRef}</span> : null} — {a.description}
+                        <RecommendedActions item={a} canAct={canAct} />
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             )}
           </div>
@@ -167,8 +178,20 @@ function Dashboard() {
         </div>
 
         <div className="card">
-          <div className="card-title">Routes prioritaires</div>
-          <div className="empty-state">Aucune route prioritaire pour l'instant.</div>
+          <div className="card-title">
+            Empreinte CO₂e <span className="card-tag">90 jours</span>
+          </div>
+          <div className="kpi-value" style={{ fontSize: '28px' }}>
+            {co2.totalKg >= 1000 ? `${(co2.totalKg / 1000).toFixed(1)} t` : `${co2.totalKg} kg`}
+          </div>
+          <div className="page-sub">
+            {co2.shipmentsCounted} expédition(s)
+            {co2.avgKgPerShipment !== null ? ` · ${co2.avgKgPerShipment} kg en moyenne` : ''}
+            {co2.shipmentsWithoutRoute > 0 ? ` · ${co2.shipmentsWithoutRoute} sans itinéraire (non comptées)` : ''}
+          </div>
+          <div className="status-line">
+            Estimation t·km × {co2.factor} kg/t·km{co2.isDefaultFactor ? ' (facteur indicatif par défaut, réglable dans Paramètres)' : ''}
+          </div>
         </div>
 
         <div className="card">

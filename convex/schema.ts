@@ -17,6 +17,17 @@ export const positionSchema = v.object({
   recordedAt: v.number(),
 });
 
+export const fleetmarketLinkSchema = v.object({
+  loadId: v.number(),
+  // Statut de la charge côté FleetMarket (OPEN, MATCHED, CANCELLED, DONE).
+  status: v.string(),
+  proposalCount: v.number(),
+  postedAt: v.number(),
+  acceptedProposalId: v.optional(v.number()),
+  carrierName: v.optional(v.string()),
+  carrierComplianceScore: v.optional(v.number()),
+});
+
 export const eventSourceSchema = v.union(
   v.literal("manual"),
   v.literal("auto"),
@@ -51,6 +62,8 @@ export default defineSchema({
     slug: v.string(),
     // Compteur de références d'expédition (EX-AAAA-000001), par org.
     shipmentSeq: v.optional(v.number()),
+    // Facteur d'émission route (kg CO2e par tonne·km) ; défaut dans co2.ts.
+    co2FactorKgPerTkm: v.optional(v.number()),
   }).index("by_slug", ["slug"]),
 
   invitations: defineTable({
@@ -120,8 +133,13 @@ export default defineSchema({
     // connue, alimentée automatiquement par la synchronisation fleet-hub.
     truckRegistration: v.optional(v.string()),
     lastPosition: v.optional(positionSchema),
+    // Charge publiée sur FleetMarket (capacité de secours) et son suivi.
+    fleetmarket: v.optional(fleetmarketLinkSchema),
+    // Secret du lien de suivi public destiné au client final (/suivi/<token>).
+    trackingToken: v.optional(v.string()),
     orgId: v.optional(v.id("organizations")),
   }).index("by_reference", ["reference"])
+    .index("by_tracking_token", ["trackingToken"])
     .index("by_status", ["status"])
     .index("by_from_hub", ["fromHubId"])
     .index("by_to_hub", ["toHubId"])
@@ -209,4 +227,14 @@ export default defineSchema({
     speedKph: v.optional(v.number()),
     recordedAt: v.number(),
   }).index("by_shipment_and_time", ["shipmentId", "recordedAt"]),
+
+  // Connexion d'une organisation à FleetMarket (clé API donneur d'ordre).
+  fleetmarketIntegrations: defineTable({
+    orgId: v.id("organizations"),
+    baseUrl: v.string(),
+    apiKey: v.string(),
+    enabled: v.boolean(),
+    lastSyncAt: v.optional(v.number()),
+    lastError: v.optional(v.string()),
+  }).index("by_org", ["orgId"]),
 });

@@ -223,3 +223,19 @@ body { font-family: 'Syne', sans-serif; background: #080b10; color: #e8eaf0; min
 .status-line { font-family: 'DM Mono', monospace; font-size: 11px; color: #6b7a99; margin-top: 10px; line-height: 1.7; }
 .status-line .err { color: #ff8fa3; }
 .live-map .leaflet-tile-pane { filter: invert(1) hue-rotate(180deg) brightness(.8) contrast(.9) saturate(.6); }
+
+/* Suivi public (client final) */
+.public-shell { min-height: 100vh; background: #080b10; display: flex; justify-content: center; padding: 32px 16px; }
+.public-card { width: 100%; max-width: 560px; background: #0d1017; border: 1px solid #1e2535; border-radius: 14px; padding: 22px; color: #c8d0e0; }
+.public-brand { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 14px; color: #00d4aa; margin-bottom: 14px; }
+.public-ref { font-family: 'DM Mono', monospace; font-size: 20px; color: #3b82f6; }
+.public-route { font-family: 'Syne', sans-serif; font-size: 18px; margin: 4px 0 10px; }
+.public-steps { list-style: none; display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; padding: 0; margin: 18px 0 0; }
+.public-steps li { font-family: 'DM Mono', monospace; font-size: 10px; text-transform: uppercase; color: #3d4a5c; border-top: 3px solid #1e2535; padding-top: 6px; }
+.public-steps li.done { color: #00d4aa; border-top-color: #00d4aa; }
+.public-foot { margin-top: 20px; font-family: 'DM Mono', monospace; font-size: 10px; color: #3d4a5c; text-align: center; }
+
+/* Actions recommandées */
+.rec-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.rec-notice { width: 100%; font-family: 'DM Mono', monospace; font-size: 11px; color: #00d4aa; word-break: break-all; }
+.rec-error { width: 100%; font-family: 'DM Mono', monospace; font-size: 11px; color: #ff8fa3; }

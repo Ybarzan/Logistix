@@ -17,4 +17,7 @@ crons.interval(
 // (uniquement pour les organisations ayant activé l'intégration).
 crons.interval("sync fleet-hub positions", { minutes: 2 }, internal.fleethub.syncAll, {});
 
+// Charges publiées sur FleetMarket : statut, transporteur retenu, GPS.
+crons.interval("sync FleetMarket loads", { minutes: 2 }, internal.fleetmarket.syncAll, {});
+
 export default crons;

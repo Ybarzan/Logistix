@@ -11,7 +11,7 @@
 services:
   # ---- Backend Convex auto-hébergé ----
   convex-backend:
-    image: ghcr.io/get-convex/convex-backend:latest
+    image: ghcr.io/get-convex/convex-backend@sha256:1f2044e3eac463ac78973b136c0baf72d4ada602611d853d6f99f280e29e0a98  # figée (build du 2026-08-10) : ne pas suivre :latest
     container_name: convex-backend
     restart: unless-stopped
     environment:

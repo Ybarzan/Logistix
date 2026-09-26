@@ -155,5 +155,6 @@ export default defineSchema({
     .index("by_severity", ["severity"])
     .index("by_type", ["type"])
     .index("by_org", ["orgId"])
-    .index("by_org_and_status", ["orgId", "status"]),
+    .index("by_org_and_status", ["orgId", "status"])
+    .index("by_org_and_created_at", ["orgId", "createdAt"]),
 });

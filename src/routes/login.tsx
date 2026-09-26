@@ -149,7 +149,7 @@ function LoginPage() {
 
         <div className="auth-hint">
           {mode === 'signUp'
-            ? 'Le premier compte rattache l’organisation de démo.'
+            ? 'Chaque inscription crée son organisation ; rejoignez une équipe via son lien d’invitation.'
             : 'Le démo : créez un compte puis connectez-vous.'}
         </div>
         <div className="auth-live">

@@ -17,7 +17,7 @@ function SLAPage() {
     <>
       <div className="page-header">
         <div className="page-title">Délais &amp; SLA</div>
-        <div className="page-sub">Performance d'engagement des délais · {stats.total} expéditions au total</div>
+        <div className="page-sub">Performance d'engagement des délais · {stats.total} expéditions sur 90 jours</div>
       </div>
 
       <div className="kpi-grid">

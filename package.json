@@ -29,7 +29,6 @@
   "devDependencies": {
     "@convex-dev/eslint-plugin": "^1.1.1",
     "@edge-runtime/vm": "^5.0.0",
-    "@tailwindcss/vite": "^4.1.18",
     "@tanstack/eslint-config": "^0.3.4",
     "@types/node": "^25.3.0",
     "@types/react": "^19.2.13",
@@ -38,7 +37,6 @@
     "concurrently": "~9.2.1",
     "convex-test": "^0.0.60",
     "prettier": "^3.8.1",
-    "tailwindcss": "^4.1.18",
     "typescript": "^5.9.3",
     "vite": "^7.3.1",
     "vite-tsconfig-paths": "^6.0.5",

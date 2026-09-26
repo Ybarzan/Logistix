@@ -16,7 +16,7 @@ function PerformancePage() {
     <>
       <div className="page-header">
         <div className="page-title">Performance du réseau</div>
-        <div className="page-sub">Volumes, charge des hubs et engagement · 7 jours</div>
+        <div className="page-sub">Volumes, charge des hubs et engagement · 90 jours (volume : 7 jours)</div>
       </div>
 
       <div className="kpi-grid">

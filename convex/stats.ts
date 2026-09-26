@@ -4,6 +4,9 @@ import { getOrgScope } from "./orgContext";
 import type { Id } from "./_generated/dataModel";
 
 const DAYS = 7;
+const DAY_MS = 24 * 60 * 60 * 1000;
+/** Fenêtre d'analyse des statistiques SLA / performance. */
+export const WINDOW_DAYS = 90;
 
 function dayLabel(timestamp: number): string {
   const days = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
@@ -66,13 +69,20 @@ export const slaStats = query({
       };
     }
 
+    // Lectures bornées : fenêtre glissante indexée plutôt qu'un scan
+    // complet de l'historique (limites de lecture Convex par requête).
+    const since = Date.now() - WINDOW_DAYS * DAY_MS;
     const shipments = await ctx.db
       .query("shipments")
-      .withIndex("by_org", (q) => q.eq("orgId", scope.orgId))
+      .withIndex("by_org_and_created_at", (q) =>
+        q.eq("orgId", scope.orgId).gte("createdAt", since),
+      )
       .collect();
     const incidents = await ctx.db
       .query("incidents")
-      .withIndex("by_org", (q) => q.eq("orgId", scope.orgId))
+      .withIndex("by_org_and_created_at", (q) =>
+        q.eq("orgId", scope.orgId).gte("createdAt", since),
+      )
       .collect();
     const routes = await ctx.db
       .query("routes")
@@ -221,20 +231,30 @@ export const performanceStats = query({
     };
     if (!scope) return empty;
 
+    // Lectures bornées : fenêtre glissante indexée plutôt qu'un scan
+    // complet de l'historique (limites de lecture Convex par requête).
+    const since = Date.now() - WINDOW_DAYS * DAY_MS;
     const shipments = await ctx.db
       .query("shipments")
-      .withIndex("by_org", (q) => q.eq("orgId", scope.orgId))
+      .withIndex("by_org_and_created_at", (q) =>
+        q.eq("orgId", scope.orgId).gte("createdAt", since),
+      )
       .collect();
     const incidents = await ctx.db
       .query("incidents")
-      .withIndex("by_org", (q) => q.eq("orgId", scope.orgId))
+      .withIndex("by_org_and_created_at", (q) =>
+        q.eq("orgId", scope.orgId).gte("createdAt", since),
+      )
       .collect();
     const hubs = await ctx.db
       .query("hubs")
       .withIndex("by_org", (q) => q.eq("orgId", scope.orgId))
       .collect();
 
-    const inTransit = shipments.filter((s) => s.status === "in_transit");
+    const inTransit = await ctx.db
+      .query("shipments")
+      .withIndex("by_org_and_status", (q) => q.eq("orgId", scope.orgId).eq("status", "in_transit"))
+      .collect();
     const delivered = shipments.filter((s) => s.status === "delivered");
     const onTime = delivered.filter(
       (s) => s.actualDelivery && s.estimatedDelivery && s.actualDelivery <= s.estimatedDelivery,

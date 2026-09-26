@@ -14,6 +14,7 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as LayoutIndexRouteImport } from './routes/_layout/index'
 import { Route as LayoutHubsRouteImport } from './routes/_layout/hubs'
 import { Route as LayoutIncidentsRouteImport } from './routes/_layout/incidents'
+import { Route as LayoutParametresRouteImport } from './routes/_layout/parametres'
 import { Route as LayoutPerformanceRouteImport } from './routes/_layout/performance'
 import { Route as LayoutRoutesRouteImport } from './routes/_layout/routes'
 import { Route as LayoutSlaRouteImport } from './routes/_layout/sla'
@@ -43,6 +44,11 @@ const LayoutHubsRoute = LayoutHubsRouteImport.update({
 const LayoutIncidentsRoute = LayoutIncidentsRouteImport.update({
   id: '/incidents',
   path: '/incidents',
+  getParentRoute: () => LayoutRoute,
+} as any)
+const LayoutParametresRoute = LayoutParametresRouteImport.update({
+  id: '/parametres',
+  path: '/parametres',
   getParentRoute: () => LayoutRoute,
 } as any)
 const LayoutPerformanceRoute = LayoutPerformanceRouteImport.update({
@@ -82,6 +88,7 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/hubs': typeof LayoutHubsRoute
   '/incidents': typeof LayoutIncidentsRoute
+  '/parametres': typeof LayoutParametresRoute
   '/performance': typeof LayoutPerformanceRoute
   '/routes': typeof LayoutRoutesRoute
   '/sla': typeof LayoutSlaRoute
@@ -93,6 +100,7 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/hubs': typeof LayoutHubsRoute
   '/incidents': typeof LayoutIncidentsRoute
+  '/parametres': typeof LayoutParametresRoute
   '/performance': typeof LayoutPerformanceRoute
   '/routes': typeof LayoutRoutesRoute
   '/sla': typeof LayoutSlaRoute
@@ -107,6 +115,7 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/_layout/hubs': typeof LayoutHubsRoute
   '/_layout/incidents': typeof LayoutIncidentsRoute
+  '/_layout/parametres': typeof LayoutParametresRoute
   '/_layout/performance': typeof LayoutPerformanceRoute
   '/_layout/routes': typeof LayoutRoutesRoute
   '/_layout/sla': typeof LayoutSlaRoute
@@ -122,6 +131,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/hubs'
     | '/incidents'
+    | '/parametres'
     | '/performance'
     | '/routes'
     | '/sla'
@@ -133,6 +143,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/hubs'
     | '/incidents'
+    | '/parametres'
     | '/performance'
     | '/routes'
     | '/sla'
@@ -146,6 +157,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/_layout/hubs'
     | '/_layout/incidents'
+    | '/_layout/parametres'
     | '/_layout/performance'
     | '/_layout/routes'
     | '/_layout/sla'
@@ -197,6 +209,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LayoutIncidentsRouteImport
       parentRoute: typeof LayoutRoute
     }
+    '/_layout/parametres': {
+      id: '/_layout/parametres'
+      path: '/parametres'
+      fullPath: '/parametres'
+      preLoaderRoute: typeof LayoutParametresRouteImport
+      parentRoute: typeof LayoutRoute
+    }
     '/_layout/performance': {
       id: '/_layout/performance'
       path: '/performance'
@@ -245,6 +264,7 @@ declare module '@tanstack/react-router' {
 interface LayoutRouteChildren {
   LayoutHubsRoute: typeof LayoutHubsRoute
   LayoutIncidentsRoute: typeof LayoutIncidentsRoute
+  LayoutParametresRoute: typeof LayoutParametresRoute
   LayoutPerformanceRoute: typeof LayoutPerformanceRoute
   LayoutRoutesRoute: typeof LayoutRoutesRoute
   LayoutSlaRoute: typeof LayoutSlaRoute
@@ -257,6 +277,7 @@ interface LayoutRouteChildren {
 const LayoutRouteChildren: LayoutRouteChildren = {
   LayoutHubsRoute: LayoutHubsRoute,
   LayoutIncidentsRoute: LayoutIncidentsRoute,
+  LayoutParametresRoute: LayoutParametresRoute,
   LayoutPerformanceRoute: LayoutPerformanceRoute,
   LayoutRoutesRoute: LayoutRoutesRoute,
   LayoutSlaRoute: LayoutSlaRoute,

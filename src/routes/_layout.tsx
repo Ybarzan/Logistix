@@ -144,13 +144,13 @@ function Layout() {
           Traçabilité
         </Link>
         <div className="nav-section">Config</div>
-        <div className="nav-item">
+        <Link to="/parametres" className="nav-item" activeProps={{ className: 'nav-item active' }}>
           <svg className="nav-icon" viewBox="0 0 16 16" fill="none">
             <circle cx="8" cy="8" r="2.5" stroke="currentColor" strokeWidth="1.2"/>
             <path d="M8 1v2M8 13v2M1 8h2M13 8h2M3.22 3.22l1.41 1.41M11.36 11.36l1.42 1.42M3.22 12.78l1.41-1.41M11.36 4.64l1.42-1.42" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
           </svg>
           Paramètres
-        </div>
+        </Link>
       </div>
 
       <div className="main">

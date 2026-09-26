@@ -197,3 +197,12 @@ body { font-family: 'Syne', sans-serif; background: #080b10; color: #e8eaf0; min
 
 .link { background: none; border: none; color: #3b82f6; font-family: 'DM Mono', monospace; font-size: 11px; cursor: pointer; padding: 0; }
 .link:hover { text-decoration: underline; }
+/* Paramètres / tables génériques */
+.notice { background: #00d4aa14; border: 1px solid #00d4aa33; color: #00d4aa; font-size: 12px; padding: 9px 11px; border-radius: 8px; margin-bottom: 14px; font-family: 'DM Mono', monospace; }
+.data-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.data-table th { text-align: left; font-size: 10px; font-family: 'DM Mono', monospace; text-transform: uppercase; letter-spacing: .08em; color: #3d4a5c; padding: 8px 10px; border-bottom: 1px solid #1e2535; }
+.data-table td { padding: 10px; border-bottom: 1px solid #141a26; color: #c8d0e0; }
+.data-table .select { max-width: 180px; }
+.mono { font-family: 'DM Mono', monospace; font-size: 12px; }
+.invite-link { margin-top: 14px; padding-top: 14px; border-top: 1px solid #1e2535; }
+@media (max-width: 900px) { .grid-2, .field-row { grid-template-columns: 1fr; } }

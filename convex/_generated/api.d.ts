@@ -18,7 +18,9 @@ import type * as orgContext from "../orgContext.js";
 import type * as organizations from "../organizations.js";
 import type * as routes from "../routes.js";
 import type * as seed from "../seed.js";
+import type * as shipmentStatus from "../shipmentStatus.js";
 import type * as shipments from "../shipments.js";
+import type * as signup from "../signup.js";
 import type * as stats from "../stats.js";
 import type * as tracking from "../tracking.js";
 
@@ -39,7 +41,9 @@ declare const fullApi: ApiFromModules<{
   organizations: typeof organizations;
   routes: typeof routes;
   seed: typeof seed;
+  shipmentStatus: typeof shipmentStatus;
   shipments: typeof shipments;
+  signup: typeof signup;
   stats: typeof stats;
   tracking: typeof tracking;
 }>;

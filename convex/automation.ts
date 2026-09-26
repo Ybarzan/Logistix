@@ -5,11 +5,19 @@ import {
   internalQuery,
 } from "./_generated/server";
 import { internal } from "./_generated/api";
+import { applyStatusChange } from "./shipments";
+import { canTransition } from "./shipmentStatus";
+import type { MutationCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 
 const HOUR_MS = 60 * 60 * 1000;
 
+/** Seuil de surcharge d'un hub (charge / capacité). */
+export const OVERLOAD_RATIO = 0.9;
+
 type Severity = "low" | "medium" | "high" | "critical";
+
+const SEVERITY_RANK: Record<Severity, number> = { low: 0, medium: 1, high: 2, critical: 3 };
 
 /**
  * Sévérité d'un incident de retard selon la durée de dépassement :
@@ -35,365 +43,177 @@ export function formatOverrun(ms: number): string {
   return `${minutes}min`;
 }
 
-// ---------------------------------------------------------------------------
-// Queries internes (lecture)
-// ---------------------------------------------------------------------------
-
-export const listOrganizations = internalQuery({
+export const listOrganizationIds = internalQuery({
   args: {},
-  returns: v.array(
-    v.object({
-      _id: v.id("organizations"),
-      _creationTime: v.number(),
-      name: v.string(),
-      slug: v.string(),
-    }),
-  ),
+  returns: v.array(v.id("organizations")),
   handler: async (ctx) => {
-    return await ctx.db.query("organizations").collect();
+    const orgs = await ctx.db.query("organizations").collect();
+    return orgs.map((o) => o._id);
   },
 });
 
+async function openIncidents(
+  ctx: MutationCtx,
+  orgId: Id<"organizations">,
+): Promise<Array<Doc<"incidents">>> {
+  const result: Array<Doc<"incidents">> = [];
+  for (const status of ["open", "investigating"] as const) {
+    const rows = await ctx.db
+      .query("incidents")
+      .withIndex("by_org_and_status", (q) => q.eq("orgId", orgId).eq("status", status))
+      .collect();
+    result.push(...rows);
+  }
+  return result;
+}
+
 /**
- * Expéditions d'une organisation en statut pending/loading/in_transit
- * dont la livraison estimée est dépassée (retard avéré).
- * Index by_org_and_status, puis filtre en mémoire sur estimatedDelivery.
+ * Détection des retards pour une organisation, en une transaction :
+ * - expédition active dont l'ETA est dépassée sans incident ouvert
+ *   → incident "delay" automatique + passage au statut `delayed`
+ *   quand la machine à états le permet ;
+ * - incident automatique déjà ouvert → sévérité escaladée si le
+ *   dépassement a franchi un seuil (jamais rétrogradée).
  */
-export const listDelayedShipments = internalQuery({
-  args: {
-    orgId: v.id("organizations"),
-    now: v.number(),
-  },
-  returns: v.array(
-    v.object({
-      _id: v.id("shipments"),
-      reference: v.string(),
-      estimatedDelivery: v.optional(v.number()),
-    }),
-  ),
-  handler: async (ctx, args) => {
-    const statuses = ["in_transit", "loading", "pending"] as const;
-    const results: Array<{
-      _id: Id<"shipments">;
-      reference: string;
-      estimatedDelivery?: number;
-    }> = [];
-    for (const status of statuses) {
+export const detectDelaysForOrg = internalMutation({
+  args: { orgId: v.id("organizations"), now: v.number() },
+  returns: v.object({ created: v.number(), escalated: v.number() }),
+  handler: async (ctx, { orgId, now }) => {
+    const incidents = await openIncidents(ctx, orgId);
+    const delayIncidentByShipment = new Map<Id<"shipments">, Doc<"incidents">>();
+    for (const inc of incidents) {
+      if (inc.type === "delay" && inc.shipmentId !== undefined) {
+        delayIncidentByShipment.set(inc.shipmentId, inc);
+      }
+    }
+
+    let created = 0;
+    let escalated = 0;
+    for (const status of ["pending", "loading", "in_transit", "delayed"] as const) {
       const shipments = await ctx.db
         .query("shipments")
-        .withIndex("by_org_and_status", (q) =>
-          q.eq("orgId", args.orgId).eq("status", status),
-        )
+        .withIndex("by_org_and_status", (q) => q.eq("orgId", orgId).eq("status", status))
         .collect();
       for (const shipment of shipments) {
-        if (
-          shipment.estimatedDelivery !== undefined &&
-          shipment.estimatedDelivery < args.now
-        ) {
-          results.push({
-            _id: shipment._id,
-            reference: shipment.reference,
-            estimatedDelivery: shipment.estimatedDelivery,
-          });
+        if (shipment.estimatedDelivery === undefined || shipment.estimatedDelivery >= now) {
+          continue;
         }
-      }
-    }
-    return results;
-  },
-});
-
-/**
- * Incidents de type "delay" encore ouverts (open ou investigating)
- * d'une organisation. Index by_org_and_status, puis filtre en mémoire
- * sur le type.
- */
-export const listOpenDelayIncidents = internalQuery({
-  args: {
-    orgId: v.id("organizations"),
-  },
-  returns: v.array(
-    v.object({
-      _id: v.id("incidents"),
-      shipmentId: v.optional(v.id("shipments")),
-    }),
-  ),
-  handler: async (ctx, args) => {
-    const statuses = ["open", "investigating"] as const;
-    const results: Array<{
-      _id: Id<"incidents">;
-      shipmentId?: Id<"shipments">;
-    }> = [];
-    for (const status of statuses) {
-      const incidents = await ctx.db
-        .query("incidents")
-        .withIndex("by_org_and_status", (q) =>
-          q.eq("orgId", args.orgId).eq("status", status),
-        )
-        .collect();
-      for (const incident of incidents) {
-        if (incident.type === "delay") {
-          results.push({ _id: incident._id, shipmentId: incident.shipmentId });
-        }
-      }
-    }
-    return results;
-  },
-});
-
-/**
- * Hubs d'une organisation dont la charge dépasse 90% de la capacité.
- * Index by_org, puis filtre en mémoire sur le ratio charge/capacité.
- */
-export const listOverloadedHubs = internalQuery({
-  args: {
-    orgId: v.id("organizations"),
-  },
-  returns: v.array(
-    v.object({
-      _id: v.id("hubs"),
-      name: v.string(),
-      currentLoad: v.number(),
-      capacity: v.number(),
-    }),
-  ),
-  handler: async (ctx, args) => {
-    const hubs = await ctx.db
-      .query("hubs")
-      .withIndex("by_org", (q) => q.eq("orgId", args.orgId))
-      .collect();
-    const results: Array<{
-      _id: Id<"hubs">;
-      name: string;
-      currentLoad: number;
-      capacity: number;
-    }> = [];
-    for (const hub of hubs) {
-      if (hub.capacity > 0 && hub.currentLoad / hub.capacity > 0.9) {
-        results.push({
-          _id: hub._id,
-          name: hub.name,
-          currentLoad: hub.currentLoad,
-          capacity: hub.capacity,
-        });
-      }
-    }
-    return results;
-  },
-});
-
-/**
- * Incidents de type "capacity" encore ouverts (open ou investigating)
- * d'une organisation. Index by_org_and_status, puis filtre en mémoire
- * sur le type.
- */
-export const listOpenCapacityIncidents = internalQuery({
-  args: {
-    orgId: v.id("organizations"),
-  },
-  returns: v.array(
-    v.object({
-      _id: v.id("incidents"),
-      hubId: v.optional(v.id("hubs")),
-    }),
-  ),
-  handler: async (ctx, args) => {
-    const statuses = ["open", "investigating"] as const;
-    const results: Array<{
-      _id: Id<"incidents">;
-      hubId?: Id<"hubs">;
-    }> = [];
-    for (const status of statuses) {
-      const incidents = await ctx.db
-        .query("incidents")
-        .withIndex("by_org_and_status", (q) =>
-          q.eq("orgId", args.orgId).eq("status", status),
-        )
-        .collect();
-      for (const incident of incidents) {
-        if (incident.type === "capacity") {
-          results.push({ _id: incident._id, hubId: incident.hubId });
-        }
-      }
-    }
-    return results;
-  },
-});
-
-// ---------------------------------------------------------------------------
-// Mutation interne (écriture)
-// ---------------------------------------------------------------------------
-
-/**
- * Crée un incident automatique, toujours au statut "open" avec
- * createdAt = Date.now(). shipmentId/hubId sont optionnels et omis
- * (jamais undefined) quand absents.
- */
-export const createIncident = internalMutation({
-  args: {
-    orgId: v.id("organizations"),
-    shipmentId: v.optional(v.id("shipments")),
-    hubId: v.optional(v.id("hubs")),
-    type: v.union(
-      v.literal("breakdown"),
-      v.literal("customs"),
-      v.literal("capacity"),
-      v.literal("delay"),
-      v.literal("damage"),
-      v.literal("other"),
-    ),
-    severity: v.union(
-      v.literal("low"),
-      v.literal("medium"),
-      v.literal("high"),
-      v.literal("critical"),
-    ),
-    title: v.string(),
-    description: v.string(),
-  },
-  returns: v.id("incidents"),
-  handler: async (ctx, args) => {
-    return await ctx.db.insert("incidents", {
-      orgId: args.orgId,
-      type: args.type,
-      severity: args.severity,
-      title: args.title,
-      description: args.description,
-      status: "open" as const,
-      createdAt: Date.now(),
-      ...(args.shipmentId !== undefined ? { shipmentId: args.shipmentId } : {}),
-      ...(args.hubId !== undefined ? { hubId: args.hubId } : {}),
-    });
-  },
-});
-
-// ---------------------------------------------------------------------------
-// Actions internes (détection)
-// ---------------------------------------------------------------------------
-
-/**
- * Détecte les expéditions en retard pour chaque organisation et crée
- * un incident "delay" par expédition, sans doublon tant qu'un incident
- * delay ouvert (open/investigating) existe déjà pour cette expédition.
- */
-export const detectDelays = internalAction({
-  args: {},
-  returns: v.null(),
-  handler: async (ctx) => {
-    const now = Date.now();
-    const orgs: Array<Doc<"organizations">> = await ctx.runQuery(
-      internal.automation.listOrganizations,
-      {},
-    );
-
-    for (const org of orgs) {
-      const delayedShipments: Array<{
-        _id: Id<"shipments">;
-        reference: string;
-        estimatedDelivery?: number;
-      }> = await ctx.runQuery(internal.automation.listDelayedShipments, {
-        orgId: org._id,
-        now,
-      });
-      const openDelayIncidents: Array<{
-        _id: Id<"incidents">;
-        shipmentId?: Id<"shipments">;
-      }> = await ctx.runQuery(internal.automation.listOpenDelayIncidents, {
-        orgId: org._id,
-      });
-
-      // Anti-doublon : expéditions déjà couvertes par un incident delay ouvert.
-      const coveredShipmentIds = new Set<Id<"shipments">>();
-      for (const incident of openDelayIncidents) {
-        if (incident.shipmentId !== undefined) {
-          coveredShipmentIds.add(incident.shipmentId);
-        }
-      }
-
-      for (const shipment of delayedShipments) {
-        if (coveredShipmentIds.has(shipment._id)) continue;
-        if (shipment.estimatedDelivery === undefined) continue;
         const overrunMs = now - shipment.estimatedDelivery;
-        await ctx.runMutation(internal.automation.createIncident, {
-          orgId: org._id,
+        const severity = severityForDelay(overrunMs);
+        const description = `${shipment.reference} : retard de ${formatOverrun(overrunMs)} par rapport à la livraison estimée`;
+        const existing = delayIncidentByShipment.get(shipment._id);
+
+        if (existing) {
+          // On n'escalade que nos propres incidents : un incident saisi
+          // par un humain garde la sévérité qu'il lui a donnée.
+          if (
+            existing.source === "auto" &&
+            SEVERITY_RANK[severity] > SEVERITY_RANK[existing.severity]
+          ) {
+            await ctx.db.patch("incidents", existing._id, { severity, description });
+            escalated += 1;
+          }
+          continue;
+        }
+
+        const incidentId = await ctx.db.insert("incidents", {
+          orgId,
           shipmentId: shipment._id,
           type: "delay",
-          severity: severityForDelay(overrunMs),
+          severity,
           title: "Retard détecté automatiquement",
-          description: `${shipment.reference} : retard de ${formatOverrun(overrunMs)} par rapport à la livraison estimée`,
+          description,
+          status: "open",
+          source: "auto",
+          createdAt: now,
         });
-      }
-    }
-
-    return null;
-  },
-});
-
-/**
- * Détecte les hubs surchargés (> 90% de capacité) pour chaque
- * organisation et crée un incident "capacity" par hub, sans doublon
- * tant qu'un incident capacity ouvert existe déjà pour ce hub.
- */
-export const detectHubOverload = internalAction({
-  args: {},
-  returns: v.null(),
-  handler: async (ctx) => {
-    const orgs: Array<Doc<"organizations">> = await ctx.runQuery(
-      internal.automation.listOrganizations,
-      {},
-    );
-
-    for (const org of orgs) {
-      const overloadedHubs: Array<{
-        _id: Id<"hubs">;
-        name: string;
-        currentLoad: number;
-        capacity: number;
-      }> = await ctx.runQuery(internal.automation.listOverloadedHubs, {
-        orgId: org._id,
-      });
-      const openCapacityIncidents: Array<{
-        _id: Id<"incidents">;
-        hubId?: Id<"hubs">;
-      }> = await ctx.runQuery(internal.automation.listOpenCapacityIncidents, {
-        orgId: org._id,
-      });
-
-      // Anti-doublon : hubs déjà couverts par un incident capacity ouvert.
-      const coveredHubIds = new Set<Id<"hubs">>();
-      for (const incident of openCapacityIncidents) {
-        if (incident.hubId !== undefined) {
-          coveredHubIds.add(incident.hubId);
+        // L'expédition passe en `delayed` juste après : elle sera relue
+        // par l'itération "delayed" de cette même boucle, il faut donc
+        // qu'elle soit déjà considérée comme couverte.
+        const inserted = await ctx.db.get("incidents", incidentId);
+        if (inserted) delayIncidentByShipment.set(shipment._id, inserted);
+        created += 1;
+        if (canTransition(shipment.status, "delayed")) {
+          await applyStatusChange(
+            ctx,
+            shipment,
+            "delayed",
+            `Retard détecté automatiquement (${formatOverrun(overrunMs)})`,
+          );
         }
       }
-
-      for (const hub of overloadedHubs) {
-        if (coveredHubIds.has(hub._id)) continue;
-        const loadPct = Math.round((hub.currentLoad / hub.capacity) * 100);
-        await ctx.runMutation(internal.automation.createIncident, {
-          orgId: org._id,
-          hubId: hub._id,
-          type: "capacity",
-          severity: "medium",
-          title: `Surcharge détectée : ${hub.name}`,
-          description: `Capacité à ${loadPct}% — redirection recommandée`,
-        });
-      }
     }
-
-    return null;
+    return { created, escalated };
   },
 });
 
 /**
- * Point d'entrée du cron : exécute la détection des retards puis
- * celle des surcharges de hubs.
+ * Surcharge des hubs pour une organisation : ouvre un incident
+ * "capacity" au-delà de 90 % et clôture l'incident automatique
+ * correspondant quand la charge redescend (ou que le hub est désactivé).
+ */
+export const detectHubOverloadForOrg = internalMutation({
+  args: { orgId: v.id("organizations"), now: v.number() },
+  returns: v.object({ created: v.number(), resolved: v.number() }),
+  handler: async (ctx, { orgId, now }) => {
+    const incidents = await openIncidents(ctx, orgId);
+    const capacityIncidentByHub = new Map<Id<"hubs">, Doc<"incidents">>();
+    for (const inc of incidents) {
+      if (inc.type === "capacity" && inc.hubId !== undefined) {
+        capacityIncidentByHub.set(inc.hubId, inc);
+      }
+    }
+
+    const hubs = await ctx.db
+      .query("hubs")
+      .withIndex("by_org", (q) => q.eq("orgId", orgId))
+      .collect();
+    let created = 0;
+    let resolved = 0;
+    for (const hub of hubs) {
+      const ratio = hub.capacity > 0 ? hub.currentLoad / hub.capacity : 0;
+      const overloaded = hub.isActive && ratio > OVERLOAD_RATIO;
+      const existing = capacityIncidentByHub.get(hub._id);
+
+      if (overloaded && !existing) {
+        await ctx.db.insert("incidents", {
+          orgId,
+          hubId: hub._id,
+          type: "capacity",
+          severity: ratio >= 1 ? "high" : "medium",
+          title: `Surcharge détectée : ${hub.name}`,
+          description: `Capacité à ${Math.round(ratio * 100)}% — redirection recommandée`,
+          status: "open",
+          source: "auto",
+          createdAt: now,
+        });
+        created += 1;
+      } else if (!overloaded && existing?.source === "auto") {
+        await ctx.db.patch("incidents", existing._id, { status: "resolved", resolvedAt: now });
+        resolved += 1;
+      }
+    }
+    return { created, resolved };
+  },
+});
+
+/**
+ * Point d'entrée du cron : une transaction par organisation et par
+ * détecteur, pour qu'une organisation volumineuse ne bloque pas les autres.
  */
 export const runAutomation = internalAction({
   args: {},
   returns: v.null(),
   handler: async (ctx) => {
-    await ctx.runAction(internal.automation.detectDelays, {});
-    await ctx.runAction(internal.automation.detectHubOverload, {});
+    const now = Date.now();
+    const orgIds: Array<Id<"organizations">> = await ctx.runQuery(
+      internal.automation.listOrganizationIds,
+      {},
+    );
+    for (const orgId of orgIds) {
+      await ctx.runMutation(internal.automation.detectDelaysForOrg, { orgId, now });
+      await ctx.runMutation(internal.automation.detectHubOverloadForOrg, { orgId, now });
+    }
     return null;
   },
 });

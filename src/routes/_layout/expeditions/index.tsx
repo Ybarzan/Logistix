@@ -3,19 +3,19 @@ import { useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
 import { convexQuery } from '@convex-dev/react-query'
 import { useMutation } from 'convex/react'
 import { useState } from 'react'
-import { api } from '../../../convex/_generated/api'
-import { Field, Modal, NumberInput, Select, TextInput } from '../../components/form'
+import { api } from '../../../../convex/_generated/api'
+import { Field, Modal, NumberInput, Select, TextInput } from '../../../components/form'
 import {
   formatDate,
   priorityColors,
   statusClasses,
   statusLabels,
-} from '../../components/shipmentMeta'
-import { can } from '../../components/rbac'
-import type { Id } from '../../../convex/_generated/dataModel'
+} from '../../../components/shipmentMeta'
+import { can } from '../../../components/rbac'
+import type { Id } from '../../../../convex/_generated/dataModel'
 import type { FormEvent } from 'react'
 
-export const Route = createFileRoute('/_layout/expeditions')({
+export const Route = createFileRoute('/_layout/expeditions/')({
   head: () => ({ meta: [{ title: 'Expéditions — Logistix' }] }),
   component: ShipmentsPage,
 })

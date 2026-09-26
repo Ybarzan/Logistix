@@ -50,9 +50,11 @@ function Dashboard() {
           <div className="kpi-delta up">en temps réel</div>
         </div>
         <div className="kpi blue">
-          <div className="kpi-label">Taux livraison J+1</div>
-          <div className="kpi-value">{stats.onTimeRate}%</div>
-          <div className="kpi-delta up">sur 7 jours</div>
+          <div className="kpi-label">Livraisons à l'heure</div>
+          <div className="kpi-value">{stats.onTimeRate === null ? '—' : `${stats.onTimeRate}%`}</div>
+          <div className="kpi-delta up">
+            {stats.deliveredLast7d > 0 ? `${stats.deliveredLast7d} livraison(s) sur 7 jours` : 'aucune livraison sur 7 jours'}
+          </div>
         </div>
         <div className="kpi amber">
           <div className="kpi-label">Retards actifs</div>
@@ -174,9 +176,9 @@ function Dashboard() {
           <div className="gauge-wrap">
             <svg className="gauge-svg" viewBox="0 0 120 70">
               <path d="M15 65 A50 50 0 0 1 105 65" fill="none" stroke="#1a2135" strokeWidth="10" strokeLinecap="round"/>
-              <path d="M15 65 A50 50 0 0 1 105 65" fill="none" stroke="#00d4aa" strokeWidth="10" strokeLinecap="round" strokeDasharray="157" strokeDashoffset="22"/>
+              <path d="M15 65 A50 50 0 0 1 105 65" fill="none" stroke="#00d4aa" strokeWidth="10" strokeLinecap="round" strokeDasharray="157" strokeDashoffset={157 * (1 - (stats.onTimeRate ?? 0) / 100)}/>
             </svg>
-            <div className="gauge-pct">{stats.slaRate}%</div>
+            <div className="gauge-pct">{stats.onTimeRate === null ? '—' : `${stats.onTimeRate}%`}</div>
             <div className="gauge-label">SLA respecté</div>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginTop: '12px', borderTop: '1px solid #1e2535', paddingTop: '14px' }}>

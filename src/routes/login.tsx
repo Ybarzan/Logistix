@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 
 export const Route = createFileRoute('/login')({
+  validateSearch: (search: Record<string, unknown>): { invite?: string } =>
+    typeof search.invite === 'string' && search.invite ? { invite: search.invite } : {},
   head: () => ({ meta: [{ title: 'Connexion — Logistix' }] }),
   component: LoginPage,
 })
@@ -14,8 +16,10 @@ function LoginPage() {
   const { isAuthenticated } = useConvexAuth()
   const { signIn } = useAuthActions()
   const navigate = useNavigate()
+  const { invite } = Route.useSearch()
 
-  const [mode, setMode] = useState<Mode>('signIn')
+  // Un lien d'invitation mène directement à l'inscription.
+  const [mode, setMode] = useState<Mode>(invite ? 'signUp' : 'signIn')
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -39,6 +43,7 @@ function LoginPage() {
           password,
           name,
           flow: 'signUp',
+          ...(invite ? { inviteToken: invite } : {}),
         })
       } else {
         await signIn('password', { email, password, flow: 'signIn' })
@@ -57,6 +62,11 @@ function LoginPage() {
           Logistix<span>.</span>
         </div>
         <div className="auth-sub">Plateforme de supervision logistique</div>
+        {invite && (
+          <div className="auth-sub" style={{ color: '#00d4aa' }}>
+            Vous avez été invité à rejoindre une organisation : créez votre compte avec l'adresse e-mail invitée.
+          </div>
+        )}
 
         <div className="auth-tabs">
           <button

@@ -15,6 +15,8 @@ import {
   statusLabels,
 } from '../../../components/shipmentMeta'
 import { can } from '../../../components/rbac'
+import { SHIPMENT_TRANSITIONS, isTerminal } from '../../../../convex/shipmentStatus'
+import type { ShipmentStatus } from '../../../../convex/shipmentStatus'
 import type { Id } from '../../../../convex/_generated/dataModel'
 import type { FormEvent } from 'react'
 
@@ -23,14 +25,6 @@ export const Route = createFileRoute('/_layout/expeditions/$shipmentId')({
   component: ShipmentDetailPage,
 })
 
-const statusSteps = [
-  'pending',
-  'loading',
-  'in_transit',
-  'delivered',
-  'delayed',
-  'cancelled',
-] as const
 
 function ShipmentDetailPage() {
   const { shipmentId } = Route.useParams()
@@ -68,9 +62,10 @@ function ShipmentDetailPage() {
 
   const refresh = () => queryClient.invalidateQueries()
 
-  const changeStatus = async (status: string) => {
+  const changeStatus = async (status: ShipmentStatus) => {
+    if (status === 'cancelled' && !window.confirm('Annuler cette expédition ? Cette action est définitive.')) return
     try {
-      await updateStatus({ shipmentId: shipment._id, status: status as typeof statusSteps[number] })
+      await updateStatus({ shipmentId: shipment._id, status })
       setError(null)
       refresh()
     } catch (err) {
@@ -161,7 +156,7 @@ function ShipmentDetailPage() {
             {fromHub.city} → {toHub.city} · {shipment.weight.toLocaleString()} kg
           </div>
         </div>
-        {canEdit && <button className="btn" onClick={openEdit}>Modifier</button>}
+        {canEdit && !isTerminal(shipment.status) && <button className="btn" onClick={openEdit}>Modifier</button>}
       </div>
 
       {error && <div className="auth-error">{error}</div>}
@@ -206,18 +201,20 @@ function ShipmentDetailPage() {
             </div>
           </div>
 
-          {canEdit && (
+          {canEdit && !isTerminal(shipment.status) && (
             <div className="card">
-              <div className="card-title">Mise à jour du statut</div>
+              <div className="card-title">
+                Mise à jour du statut <span className="card-tag">actuel : {statusLabels[shipment.status]}</span>
+              </div>
               <div className="seg" style={{ flexWrap: 'wrap' }}>
-                {statusSteps.map((step) => (
+                {SHIPMENT_TRANSITIONS[shipment.status].map((step) => (
                   <button
                     key={step}
                     type="button"
-                    className={`seg-btn ${shipment.status === step ? 'active' : ''}`}
+                    className="seg-btn"
                     onClick={() => changeStatus(step)}
                   >
-                    {statusLabels[step]}
+                    → {statusLabels[step]}
                   </button>
                 ))}
               </div>

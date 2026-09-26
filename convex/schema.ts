@@ -24,14 +24,35 @@ export default defineSchema({
     isAnonymous: v.optional(v.boolean()),
     role: v.optional(roleSchema),
     orgId: v.optional(v.id("organizations")),
+    // Jeton d'invitation transmis à l'inscription ; consommé puis
+    // effacé par `afterUserCreatedOrUpdated` (jamais conservé).
+    inviteToken: v.optional(v.string()),
   })
     .index("email", ["email"])
-    .index("phone", ["phone"]),
+    .index("phone", ["phone"])
+    .index("by_org", ["orgId"]),
 
   organizations: defineTable({
     name: v.string(),
     slug: v.string(),
+    // Compteur de références d'expédition (EX-AAAA-000001), par org.
+    shipmentSeq: v.optional(v.number()),
   }).index("by_slug", ["slug"]),
+
+  invitations: defineTable({
+    orgId: v.id("organizations"),
+    email: v.string(),
+    role: roleSchema,
+    status: v.union(v.literal("pending"), v.literal("accepted"), v.literal("revoked")),
+    // Secret du lien d'invitation : l'e-mail seul ne suffit pas (pas de
+    // vérification d'e-mail avec le provider Password).
+    token: v.string(),
+    invitedBy: v.id("users"),
+    createdAt: v.number(),
+    acceptedAt: v.optional(v.number()),
+  }).index("by_email_and_status", ["email", "status"])
+    .index("by_token", ["token"])
+    .index("by_org_and_status", ["orgId", "status"]),
 
   hubs: defineTable({
     name: v.string(),
@@ -88,7 +109,9 @@ export default defineSchema({
     .index("by_to_hub", ["toHubId"])
     .index("by_created_at", ["createdAt"])
     .index("by_org", ["orgId"])
-    .index("by_org_and_status", ["orgId", "status"]),
+    .index("by_org_and_status", ["orgId", "status"])
+    .index("by_org_and_reference", ["orgId", "reference"])
+    .index("by_org_and_created_at", ["orgId", "createdAt"]),
 
   trackingEvents: defineTable({
     shipmentId: v.id("shipments"),
@@ -124,6 +147,9 @@ export default defineSchema({
     status: v.union(v.literal("open"), v.literal("investigating"), v.literal("resolved")),
     createdAt: v.number(),
     resolvedAt: v.optional(v.number()),
+    // "auto" = créé par le cron de détection (peut être escaladé ou
+    // clôturé automatiquement) ; absent/"manual" = saisi par un humain.
+    source: v.optional(v.union(v.literal("auto"), v.literal("manual"))),
     orgId: v.optional(v.id("organizations")),
   }).index("by_status", ["status"])
     .index("by_severity", ["severity"])

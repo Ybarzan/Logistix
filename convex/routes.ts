@@ -1,6 +1,23 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
-import { getOrgScope, requireRole } from "./orgContext";
+import { getOrgScope, requireOwned, requireRole } from "./orgContext";
+import type { MutationCtx } from "./_generated/server";
+import type { Id } from "./_generated/dataModel";
+
+async function validateRoute(
+  ctx: MutationCtx,
+  orgId: Id<"organizations">,
+  r: { fromHubId: Id<"hubs">; toHubId: Id<"hubs">; distance: number; avgDuration: number },
+) {
+  if (r.fromHubId === r.toHubId) {
+    throw new Error("Les hubs de départ et d'arrivée doivent être différents");
+  }
+  if (!(r.distance > 0) || !(r.avgDuration > 0)) {
+    throw new Error("Distance et durée doivent être positives");
+  }
+  await requireOwned(ctx, "hubs", r.fromHubId, orgId);
+  await requireOwned(ctx, "hubs", r.toHubId, orgId);
+}
 
 export const list = query({
   args: {},
@@ -37,6 +54,7 @@ export const create = mutation({
   returns: v.id("routes"),
   handler: async (ctx, args) => {
     const scope = requireRole(await getOrgScope(ctx), "manager");
+    await validateRoute(ctx, scope.orgId, args);
     return await ctx.db.insert("routes", { ...args, orgId: scope.orgId });
   },
 });
@@ -57,6 +75,12 @@ export const update = mutation({
     const route = await ctx.db.get("routes", args.routeId);
     if (!route) throw new Error("Itinéraire introuvable");
     if (route.orgId !== scope.orgId) throw new Error("Accès refusé");
+    await validateRoute(ctx, scope.orgId, {
+      fromHubId: args.fromHubId ?? route.fromHubId,
+      toHubId: args.toHubId ?? route.toHubId,
+      distance: args.distance ?? route.distance,
+      avgDuration: args.avgDuration ?? route.avgDuration,
+    });
     const patch: Record<string, any> = {};
     for (const key of ["name", "fromHubId", "toHubId", "distance", "avgDuration", "isActive"] as const) {
       if (args[key] !== undefined) patch[key] = args[key];

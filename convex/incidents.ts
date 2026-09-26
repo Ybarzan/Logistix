@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
-import { getOrgScope, requireRole } from "./orgContext";
+import { getOrgScope, requireOwned, requireRole } from "./orgContext";
 
 const incidentFields = v.object({
   _id: v.id("incidents"),
@@ -21,6 +21,7 @@ const incidentFields = v.object({
   status: v.union(v.literal("open"), v.literal("investigating"), v.literal("resolved")),
   createdAt: v.number(),
   resolvedAt: v.optional(v.number()),
+  source: v.optional(v.union(v.literal("auto"), v.literal("manual"))),
   orgId: v.optional(v.id("organizations")),
 });
 
@@ -73,8 +74,16 @@ export const create = mutation({
   returns: v.id("incidents"),
   handler: async (ctx, args) => {
     const scope = requireRole(await getOrgScope(ctx), "operator");
+    if (args.shipmentId !== undefined) {
+      await requireOwned(ctx, "shipments", args.shipmentId, scope.orgId);
+    }
+    if (args.hubId !== undefined) {
+      await requireOwned(ctx, "hubs", args.hubId, scope.orgId);
+    }
+    if (!args.title.trim()) throw new Error("Titre requis");
     return await ctx.db.insert("incidents", {
       orgId: scope.orgId,
+      source: "manual" as const,
       type: args.type,
       severity: args.severity,
       title: args.title,
@@ -133,9 +142,8 @@ export const update = mutation({
     if (args.description !== undefined) patch.description = args.description;
     if (args.status !== undefined) {
       patch.status = args.status;
-      if (args.status === "resolved") {
-        patch.resolvedAt = Date.now();
-      }
+      // Réouverture : on efface resolvedAt pour ne pas fausser les stats.
+      patch.resolvedAt = args.status === "resolved" ? Date.now() : undefined;
     }
     await ctx.db.patch("incidents", args.incidentId, patch);
     return null;

@@ -1,7 +1,6 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
-import { DEFAULT_ORG_SLUG } from "./organizations";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
-import type { Id } from "./_generated/dataModel";
+import type { Doc, Id } from "./_generated/dataModel";
 
 export type Role = "admin" | "manager" | "operator" | "viewer";
 
@@ -41,9 +40,9 @@ export function requireRole(scope: OrgScope | null, minRole: Role): OrgScope {
  * non authentifié / sans organisation. Toutes les fonctions Convex
  * publiques doivent passer par ici pour respecter la multi-tenant.
  *
- * Si l'utilisateur n'a pas encore d'organisation attachée (premier
- * compte après sign-up), on retombe sur l'organisation "LogistiX"
- * par défaut afin que la démo reste fonctionnelle immédiatement.
+ * Aucun repli sur une organisation par défaut : un compte sans `orgId`
+ * n'a accès à rien (fail-closed). L'organisation est attachée à
+ * l'inscription (voir `auth.ts` → `afterUserCreatedOrUpdated`).
  */
 export async function getOrgScope(
   ctx: QueryCtx | MutationCtx,
@@ -51,19 +50,27 @@ export async function getOrgScope(
   const userId = await getAuthUserId(ctx);
   if (userId === null) return null;
   const user = await ctx.db.get("users", userId);
-  if (!user) return null;
-  let orgId = user.orgId;
-  if (!orgId) {
-    const fallback = await ctx.db
-      .query("organizations")
-      .withIndex("by_slug", (q) => q.eq("slug", DEFAULT_ORG_SLUG))
-      .first();
-    if (fallback) {
-      orgId = fallback._id;
-    }
+  if (!user?.orgId) return null;
+  // Rôle absent → "viewer" : moindre privilège, lecture seule, fail-safe.
+  return { userId, orgId: user.orgId, role: user.role ?? "viewer" };
+}
+
+type OwnedTable = "hubs" | "routes" | "shipments" | "incidents";
+
+/**
+ * Charge un document et vérifie qu'il appartient à l'organisation du
+ * scope. Empêche de référencer (ou modifier) un document d'un autre
+ * tenant en passant simplement son identifiant.
+ */
+export async function requireOwned<T extends OwnedTable>(
+  ctx: QueryCtx | MutationCtx,
+  table: T,
+  id: Id<T>,
+  orgId: Id<"organizations">,
+): Promise<Doc<T>> {
+  const doc = (await ctx.db.get(table, id)) as Doc<T> | null;
+  if (!doc || doc.orgId !== orgId) {
+    throw new Error(`Ressource introuvable (${table})`);
   }
-  if (!orgId) return null;
-  // Rôle absent (compte créé avant l'ajout du champ) → "viewer" :
-  // moindre privilège, lecture seule, fail-safe.
-  return { userId, orgId, role: user.role ?? "viewer" };
+  return doc;
 }

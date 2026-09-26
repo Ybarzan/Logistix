@@ -12,13 +12,13 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as LayoutRouteImport } from './routes/_layout'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as LayoutIndexRouteImport } from './routes/_layout/index'
-import { Route as LayoutExpeditionsRouteImport } from './routes/_layout/expeditions'
 import { Route as LayoutHubsRouteImport } from './routes/_layout/hubs'
 import { Route as LayoutIncidentsRouteImport } from './routes/_layout/incidents'
 import { Route as LayoutPerformanceRouteImport } from './routes/_layout/performance'
 import { Route as LayoutRoutesRouteImport } from './routes/_layout/routes'
 import { Route as LayoutSlaRouteImport } from './routes/_layout/sla'
 import { Route as LayoutTracabiliteRouteImport } from './routes/_layout/tracabilite'
+import { Route as LayoutExpeditionsIndexRouteImport } from './routes/_layout/expeditions/index'
 import { Route as LayoutExpeditionsShipmentIdRouteImport } from './routes/_layout/expeditions/$shipmentId'
 
 const LayoutRoute = LayoutRouteImport.update({
@@ -33,11 +33,6 @@ const LoginRoute = LoginRouteImport.update({
 const LayoutIndexRoute = LayoutIndexRouteImport.update({
   id: '/',
   path: '/',
-  getParentRoute: () => LayoutRoute,
-} as any)
-const LayoutExpeditionsRoute = LayoutExpeditionsRouteImport.update({
-  id: '/expeditions',
-  path: '/expeditions',
   getParentRoute: () => LayoutRoute,
 } as any)
 const LayoutHubsRoute = LayoutHubsRouteImport.update({
@@ -70,17 +65,21 @@ const LayoutTracabiliteRoute = LayoutTracabiliteRouteImport.update({
   path: '/tracabilite',
   getParentRoute: () => LayoutRoute,
 } as any)
+const LayoutExpeditionsIndexRoute = LayoutExpeditionsIndexRouteImport.update({
+  id: '/expeditions/',
+  path: '/expeditions/',
+  getParentRoute: () => LayoutRoute,
+} as any)
 const LayoutExpeditionsShipmentIdRoute =
   LayoutExpeditionsShipmentIdRouteImport.update({
-    id: '/$shipmentId',
-    path: '/$shipmentId',
-    getParentRoute: () => LayoutExpeditionsRoute,
+    id: '/expeditions/$shipmentId',
+    path: '/expeditions/$shipmentId',
+    getParentRoute: () => LayoutRoute,
   } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof LayoutIndexRoute
   '/login': typeof LoginRoute
-  '/expeditions': typeof LayoutExpeditionsRouteWithChildren
   '/hubs': typeof LayoutHubsRoute
   '/incidents': typeof LayoutIncidentsRoute
   '/performance': typeof LayoutPerformanceRoute
@@ -88,10 +87,10 @@ export interface FileRoutesByFullPath {
   '/sla': typeof LayoutSlaRoute
   '/tracabilite': typeof LayoutTracabiliteRoute
   '/expeditions/$shipmentId': typeof LayoutExpeditionsShipmentIdRoute
+  '/expeditions/': typeof LayoutExpeditionsIndexRoute
 }
 export interface FileRoutesByTo {
   '/login': typeof LoginRoute
-  '/expeditions': typeof LayoutExpeditionsRouteWithChildren
   '/hubs': typeof LayoutHubsRoute
   '/incidents': typeof LayoutIncidentsRoute
   '/performance': typeof LayoutPerformanceRoute
@@ -100,12 +99,12 @@ export interface FileRoutesByTo {
   '/tracabilite': typeof LayoutTracabiliteRoute
   '/': typeof LayoutIndexRoute
   '/expeditions/$shipmentId': typeof LayoutExpeditionsShipmentIdRoute
+  '/expeditions': typeof LayoutExpeditionsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_layout': typeof LayoutRouteWithChildren
   '/login': typeof LoginRoute
-  '/_layout/expeditions': typeof LayoutExpeditionsRouteWithChildren
   '/_layout/hubs': typeof LayoutHubsRoute
   '/_layout/incidents': typeof LayoutIncidentsRoute
   '/_layout/performance': typeof LayoutPerformanceRoute
@@ -114,13 +113,13 @@ export interface FileRoutesById {
   '/_layout/tracabilite': typeof LayoutTracabiliteRoute
   '/_layout/': typeof LayoutIndexRoute
   '/_layout/expeditions/$shipmentId': typeof LayoutExpeditionsShipmentIdRoute
+  '/_layout/expeditions/': typeof LayoutExpeditionsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
     | '/login'
-    | '/expeditions'
     | '/hubs'
     | '/incidents'
     | '/performance'
@@ -128,10 +127,10 @@ export interface FileRouteTypes {
     | '/sla'
     | '/tracabilite'
     | '/expeditions/$shipmentId'
+    | '/expeditions/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/login'
-    | '/expeditions'
     | '/hubs'
     | '/incidents'
     | '/performance'
@@ -140,11 +139,11 @@ export interface FileRouteTypes {
     | '/tracabilite'
     | '/'
     | '/expeditions/$shipmentId'
+    | '/expeditions'
   id:
     | '__root__'
     | '/_layout'
     | '/login'
-    | '/_layout/expeditions'
     | '/_layout/hubs'
     | '/_layout/incidents'
     | '/_layout/performance'
@@ -153,6 +152,7 @@ export interface FileRouteTypes {
     | '/_layout/tracabilite'
     | '/_layout/'
     | '/_layout/expeditions/$shipmentId'
+    | '/_layout/expeditions/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -181,13 +181,6 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof LayoutIndexRouteImport
-      parentRoute: typeof LayoutRoute
-    }
-    '/_layout/expeditions': {
-      id: '/_layout/expeditions'
-      path: '/expeditions'
-      fullPath: '/expeditions'
-      preLoaderRoute: typeof LayoutExpeditionsRouteImport
       parentRoute: typeof LayoutRoute
     }
     '/_layout/hubs': {
@@ -232,29 +225,24 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LayoutTracabiliteRouteImport
       parentRoute: typeof LayoutRoute
     }
+    '/_layout/expeditions/': {
+      id: '/_layout/expeditions/'
+      path: '/expeditions'
+      fullPath: '/expeditions/'
+      preLoaderRoute: typeof LayoutExpeditionsIndexRouteImport
+      parentRoute: typeof LayoutRoute
+    }
     '/_layout/expeditions/$shipmentId': {
       id: '/_layout/expeditions/$shipmentId'
-      path: '/$shipmentId'
+      path: '/expeditions/$shipmentId'
       fullPath: '/expeditions/$shipmentId'
       preLoaderRoute: typeof LayoutExpeditionsShipmentIdRouteImport
-      parentRoute: typeof LayoutExpeditionsRoute
+      parentRoute: typeof LayoutRoute
     }
   }
 }
 
-interface LayoutExpeditionsRouteChildren {
-  LayoutExpeditionsShipmentIdRoute: typeof LayoutExpeditionsShipmentIdRoute
-}
-
-const LayoutExpeditionsRouteChildren: LayoutExpeditionsRouteChildren = {
-  LayoutExpeditionsShipmentIdRoute: LayoutExpeditionsShipmentIdRoute,
-}
-
-const LayoutExpeditionsRouteWithChildren =
-  LayoutExpeditionsRoute._addFileChildren(LayoutExpeditionsRouteChildren)
-
 interface LayoutRouteChildren {
-  LayoutExpeditionsRoute: typeof LayoutExpeditionsRouteWithChildren
   LayoutHubsRoute: typeof LayoutHubsRoute
   LayoutIncidentsRoute: typeof LayoutIncidentsRoute
   LayoutPerformanceRoute: typeof LayoutPerformanceRoute
@@ -262,10 +250,11 @@ interface LayoutRouteChildren {
   LayoutSlaRoute: typeof LayoutSlaRoute
   LayoutTracabiliteRoute: typeof LayoutTracabiliteRoute
   LayoutIndexRoute: typeof LayoutIndexRoute
+  LayoutExpeditionsShipmentIdRoute: typeof LayoutExpeditionsShipmentIdRoute
+  LayoutExpeditionsIndexRoute: typeof LayoutExpeditionsIndexRoute
 }
 
 const LayoutRouteChildren: LayoutRouteChildren = {
-  LayoutExpeditionsRoute: LayoutExpeditionsRouteWithChildren,
   LayoutHubsRoute: LayoutHubsRoute,
   LayoutIncidentsRoute: LayoutIncidentsRoute,
   LayoutPerformanceRoute: LayoutPerformanceRoute,
@@ -273,6 +262,8 @@ const LayoutRouteChildren: LayoutRouteChildren = {
   LayoutSlaRoute: LayoutSlaRoute,
   LayoutTracabiliteRoute: LayoutTracabiliteRoute,
   LayoutIndexRoute: LayoutIndexRoute,
+  LayoutExpeditionsShipmentIdRoute: LayoutExpeditionsShipmentIdRoute,
+  LayoutExpeditionsIndexRoute: LayoutExpeditionsIndexRoute,
 }
 
 const LayoutRouteWithChildren =

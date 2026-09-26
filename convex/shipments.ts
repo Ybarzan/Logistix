@@ -1,8 +1,27 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
-import { getOrgScope, requireRole } from "./orgContext";
+import { getOrgScope, requireOwned, requireRole } from "./orgContext";
 import { recordTrackingEvent } from "./tracking";
-import type { Id } from "./_generated/dataModel";
+import { canTransition, formatShipmentReference, isTerminal } from "./shipmentStatus";
+import type { ShipmentStatus } from "./shipmentStatus";
+import type { MutationCtx } from "./_generated/server";
+import type { Doc, Id } from "./_generated/dataModel";
+
+export const shipmentStatusSchema = v.union(
+  v.literal("pending"),
+  v.literal("loading"),
+  v.literal("in_transit"),
+  v.literal("delivered"),
+  v.literal("delayed"),
+  v.literal("cancelled"),
+);
+
+const prioritySchema = v.union(
+  v.literal("low"),
+  v.literal("normal"),
+  v.literal("high"),
+  v.literal("urgent"),
+);
 
 const shipmentFields = v.object({
   _id: v.id("shipments"),
@@ -11,16 +30,9 @@ const shipmentFields = v.object({
   fromHubId: v.id("hubs"),
   toHubId: v.id("hubs"),
   routeId: v.optional(v.id("routes")),
-  status: v.union(
-    v.literal("pending"),
-    v.literal("loading"),
-    v.literal("in_transit"),
-    v.literal("delivered"),
-    v.literal("delayed"),
-    v.literal("cancelled")
-  ),
+  status: shipmentStatusSchema,
   weight: v.number(),
-  priority: v.union(v.literal("low"), v.literal("normal"), v.literal("high"), v.literal("urgent")),
+  priority: prioritySchema,
   customerName: v.string(),
   customerRef: v.optional(v.string()),
   estimatedDelivery: v.optional(v.number()),
@@ -32,21 +44,14 @@ const shipmentFields = v.object({
 
 export const list = query({
   args: {
-    status: v.optional(v.union(
-      v.literal("pending"),
-      v.literal("loading"),
-      v.literal("in_transit"),
-      v.literal("delivered"),
-      v.literal("delayed"),
-      v.literal("cancelled")
-    )),
+    status: v.optional(shipmentStatusSchema),
     limit: v.optional(v.number()),
   },
   returns: v.array(shipmentFields),
   handler: async (ctx, args) => {
     const scope = await getOrgScope(ctx);
     if (!scope) return [];
-    const limit = args.limit ?? 50;
+    const limit = Math.min(args.limit ?? 50, 500);
     if (args.status) {
       const status = args.status;
       return await ctx.db
@@ -67,22 +72,25 @@ export const list = query({
 
 const emptyStats = {
   inTransit: 0,
-  onTimeRate: 0,
+  onTimeRate: null,
   activeDelays: 0,
   openIncidents: 0,
   recentShipments: [],
   activeAlerts: [],
   hubLoads: [],
-  slaRate: 0,
   onTime: 0,
   late: 0,
+  deliveredLast7d: 0,
 };
+
+const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
 export const dashboardStats = query({
   args: {},
   returns: v.object({
     inTransit: v.number(),
-    onTimeRate: v.number(),
+    // null = aucune livraison mesurable sur 7 jours (et non 0 %).
+    onTimeRate: v.union(v.number(), v.null()),
     activeDelays: v.number(),
     openIncidents: v.number(),
     recentShipments: v.array(v.object({
@@ -110,67 +118,71 @@ export const dashboardStats = query({
       load: v.number(),
       capacity: v.number(),
     })),
-    slaRate: v.number(),
     onTime: v.number(),
     late: v.number(),
+    deliveredLast7d: v.number(),
   }),
   handler: async (ctx) => {
     const scope = await getOrgScope(ctx);
     if (!scope) return emptyStats;
+    const orgId = scope.orgId;
 
-    const allShipments = await ctx.db
-      .query("shipments")
-      .withIndex("by_org", (q) => q.eq("orgId", scope.orgId))
-      .collect();
-    const inTransit = allShipments.filter(s => s.status === "in_transit").length;
-    const delayed = allShipments.filter(s => s.status === "delayed").length;
+    // Lectures bornées par index (statut) plutôt qu'un scan complet.
+    const byStatus = (status: ShipmentStatus) =>
+      ctx.db
+        .query("shipments")
+        .withIndex("by_org_and_status", (q) => q.eq("orgId", orgId).eq("status", status))
+        .collect();
+    const [inTransitDocs, delayedDocs, deliveredDocs] = await Promise.all([
+      byStatus("in_transit"),
+      byStatus("delayed"),
+      byStatus("delivered"),
+    ]);
 
-    const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
-    const recentDelivered = allShipments.filter(
-      s => s.status === "delivered" && s.createdAt >= weekAgo
+    // Ponctualité mesurée sur les livraisons *effectuées* ces 7 derniers
+    // jours (date de livraison, pas de création), avec une ETA connue.
+    const weekAgo = Date.now() - WEEK_MS;
+    const measurable = deliveredDocs.filter(
+      (s) =>
+        s.actualDelivery !== undefined &&
+        s.actualDelivery >= weekAgo &&
+        s.estimatedDelivery !== undefined,
     );
-    const onTime = recentDelivered.filter(s => s.actualDelivery && s.estimatedDelivery && s.actualDelivery <= s.estimatedDelivery).length;
-    const totalRecent = recentDelivered.length || 1;
-    const onTimeRate = Math.round((onTime / totalRecent) * 1000) / 10;
+    const onTime = measurable.filter(
+      (s) => (s.actualDelivery ?? 0) <= (s.estimatedDelivery ?? 0),
+    ).length;
+    const onTimeRate = measurable.length > 0
+      ? Math.round((onTime / measurable.length) * 1000) / 10
+      : null;
 
-    const openIncidentsCount = (await ctx.db
+    const openIncidents = await ctx.db
       .query("incidents")
-      .withIndex("by_org_and_status", (q) =>
-        q.eq("orgId", scope.orgId).eq("status", "open"),
-      )
-      .collect()).length;
+      .withIndex("by_org_and_status", (q) => q.eq("orgId", orgId).eq("status", "open"))
+      .order("desc")
+      .collect();
 
-    const recentShipmentsData = (await ctx.db
+    const recentShipmentsData = await ctx.db
       .query("shipments")
-      .withIndex("by_org", (q) => q.eq("orgId", scope.orgId))
+      .withIndex("by_org", (q) => q.eq("orgId", orgId))
       .order("desc")
-      .take(5));
-
-    const activeAlertsData = (await ctx.db
-      .query("incidents")
-      .withIndex("by_org_and_status", (q) =>
-        q.eq("orgId", scope.orgId).eq("status", "open"),
-      )
-      .order("desc")
-      .take(5));
+      .take(5);
 
     const hubsData = await ctx.db
       .query("hubs")
-      .withIndex("by_org", (q) => q.eq("orgId", scope.orgId))
+      .withIndex("by_org", (q) => q.eq("orgId", orgId))
       .collect();
-    const hubLoadsData = hubsData.slice(0, 5).map(h => ({
-      hubId: h._id,
-      name: h.name,
-      load: h.currentLoad,
-      capacity: h.capacity,
-    }));
+    const hubLoadsData = hubsData
+      .filter((h) => h.isActive)
+      .sort((a, b) => b.currentLoad / (b.capacity || 1) - a.currentLoad / (a.capacity || 1))
+      .slice(0, 5)
+      .map((h) => ({ hubId: h._id, name: h.name, load: h.currentLoad, capacity: h.capacity }));
 
     return {
-      inTransit,
+      inTransit: inTransitDocs.length,
       onTimeRate,
-      activeDelays: delayed,
-      openIncidents: openIncidentsCount,
-      recentShipments: recentShipmentsData.map(s => ({
+      activeDelays: delayedDocs.length,
+      openIncidents: openIncidents.length,
+      recentShipments: recentShipmentsData.map((s) => ({
         _id: s._id,
         reference: s.reference,
         status: s.status,
@@ -180,7 +192,7 @@ export const dashboardStats = query({
         toHubId: s.toHubId,
         createdAt: s.createdAt,
       })),
-      activeAlerts: activeAlertsData.map(i => ({
+      activeAlerts: openIncidents.slice(0, 5).map((i) => ({
         _id: i._id,
         type: i.type as string,
         severity: i.severity as string,
@@ -190,19 +202,64 @@ export const dashboardStats = query({
         createdAt: i.createdAt,
       })),
       hubLoads: hubLoadsData,
-      slaRate: onTimeRate,
       onTime,
-      late: totalRecent - onTime,
+      late: measurable.length - onTime,
+      deliveredLast7d: measurable.length,
     };
   },
 });
+
+/**
+ * Itinéraire actif de l'organisation reliant ces deux hubs, s'il existe.
+ * Sans lui, l'expédition n'apparaît dans aucune statistique par itinéraire.
+ */
+export async function resolveRoute(
+  ctx: MutationCtx,
+  orgId: Id<"organizations">,
+  fromHubId: Id<"hubs">,
+  toHubId: Id<"hubs">,
+): Promise<Doc<"routes"> | null> {
+  const candidates = await ctx.db
+    .query("routes")
+    .withIndex("by_from_hub", (q) => q.eq("fromHubId", fromHubId))
+    .collect();
+  return (
+    candidates.find((r) => r.orgId === orgId && r.toHubId === toHubId && r.isActive) ?? null
+  );
+}
+
+function validateWeight(weight: number) {
+  if (!Number.isFinite(weight) || weight <= 0) {
+    throw new Error("Le poids doit être un nombre positif");
+  }
+}
+
+async function nextReference(ctx: MutationCtx, orgId: Id<"organizations">): Promise<string> {
+  const org = await ctx.db.get("organizations", orgId);
+  if (!org) throw new Error("Organisation introuvable");
+  const now = Date.now();
+  let seq = (org.shipmentSeq ?? 0) + 1;
+  let reference = formatShipmentReference(seq, now);
+  // Garde-fou si des références ont été créées hors compteur (import, seed).
+  while (
+    await ctx.db
+      .query("shipments")
+      .withIndex("by_org_and_reference", (q) => q.eq("orgId", orgId).eq("reference", reference))
+      .first()
+  ) {
+    seq += 1;
+    reference = formatShipmentReference(seq, now);
+  }
+  await ctx.db.patch("organizations", orgId, { shipmentSeq: seq });
+  return reference;
+}
 
 export const create = mutation({
   args: {
     fromHubId: v.id("hubs"),
     toHubId: v.id("hubs"),
     weight: v.number(),
-    priority: v.union(v.literal("low"), v.literal("normal"), v.literal("high"), v.literal("urgent")),
+    priority: prioritySchema,
     customerName: v.string(),
     customerRef: v.optional(v.string()),
     estimatedDelivery: v.optional(v.number()),
@@ -210,71 +267,114 @@ export const create = mutation({
   returns: v.id("shipments"),
   handler: async (ctx, args) => {
     const scope = requireRole(await getOrgScope(ctx), "operator");
-    const reference = `EX-${String(Date.now() % 100000).padStart(5, '0')}`;
-    return await ctx.db.insert("shipments", {
+    if (args.fromHubId === args.toHubId) {
+      throw new Error("Les hubs de départ et d'arrivée doivent être différents");
+    }
+    validateWeight(args.weight);
+    const customerName = args.customerName.trim();
+    if (!customerName) throw new Error("Nom du client requis");
+    await requireOwned(ctx, "hubs", args.fromHubId, scope.orgId);
+    await requireOwned(ctx, "hubs", args.toHubId, scope.orgId);
+
+    const now = Date.now();
+    const route = await resolveRoute(ctx, scope.orgId, args.fromHubId, args.toHubId);
+    // ETA par défaut : durée moyenne de l'itinéraire (minutes) si connue.
+    const estimatedDelivery =
+      args.estimatedDelivery ?? (route ? now + route.avgDuration * 60_000 : undefined);
+    const reference = await nextReference(ctx, scope.orgId);
+
+    const shipmentId = await ctx.db.insert("shipments", {
       reference,
       fromHubId: args.fromHubId,
       toHubId: args.toHubId,
       status: "pending" as const,
       weight: args.weight,
       priority: args.priority,
-      customerName: args.customerName,
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
+      customerName,
+      createdAt: now,
+      updatedAt: now,
       orgId: scope.orgId,
+      ...(route ? { routeId: route._id } : {}),
       ...(args.customerRef !== undefined ? { customerRef: args.customerRef } : {}),
-      ...(args.estimatedDelivery !== undefined ? { estimatedDelivery: args.estimatedDelivery } : {}),
+      ...(estimatedDelivery !== undefined ? { estimatedDelivery } : {}),
     });
+    await recordTrackingEvent(ctx, {
+      orgId: scope.orgId,
+      shipmentId,
+      eventType: "created",
+      description: "Expédition enregistrée, en attente de traitement",
+    });
+    return shipmentId;
   },
 });
+
+const statusDescriptions: Record<ShipmentStatus, string> = {
+  pending: "Expédition enregistrée, en attente de traitement",
+  loading: "Chargement en cours au hub de départ",
+  in_transit: "En route vers le hub de destination",
+  delivered: "Livrée au hub de destination",
+  delayed: "Retard signalé sur le trajet",
+  cancelled: "Expédition annulée",
+};
+
+/**
+ * Applique une transition de statut validée par la machine à états,
+ * trace l'événement et clôture les incidents de retard automatiques
+ * quand l'expédition atteint un état terminal. Partagé avec le cron.
+ */
+export async function applyStatusChange(
+  ctx: MutationCtx,
+  shipment: Doc<"shipments">,
+  status: ShipmentStatus,
+  description?: string,
+): Promise<void> {
+  if (!canTransition(shipment.status, status)) {
+    throw new Error(`Transition interdite : ${shipment.status} → ${status}`);
+  }
+  const orgId = shipment.orgId;
+  if (!orgId) throw new Error("Expédition sans organisation");
+  const now = Date.now();
+  await ctx.db.patch("shipments", shipment._id, {
+    status,
+    updatedAt: now,
+    ...(status === "delivered" ? { actualDelivery: now } : {}),
+  });
+  const eventType =
+    status === "pending" ? "created" : status === "loading" ? "processed" : status;
+  await recordTrackingEvent(ctx, {
+    orgId,
+    shipmentId: shipment._id,
+    eventType,
+    description: description ?? statusDescriptions[status],
+  });
+
+  if (isTerminal(status)) {
+    for (const incidentStatus of ["open", "investigating"] as const) {
+      const incidents = await ctx.db
+        .query("incidents")
+        .withIndex("by_org_and_status", (q) =>
+          q.eq("orgId", orgId).eq("status", incidentStatus),
+        )
+        .collect();
+      for (const inc of incidents) {
+        if (inc.shipmentId === shipment._id && inc.type === "delay" && inc.source === "auto") {
+          await ctx.db.patch("incidents", inc._id, { status: "resolved", resolvedAt: now });
+        }
+      }
+    }
+  }
+}
 
 export const updateStatus = mutation({
   args: {
     shipmentId: v.id("shipments"),
-    status: v.union(
-      v.literal("pending"),
-      v.literal("loading"),
-      v.literal("in_transit"),
-      v.literal("delivered"),
-      v.literal("delayed"),
-      v.literal("cancelled")
-    ),
+    status: shipmentStatusSchema,
   },
   returns: v.null(),
   handler: async (ctx, args) => {
     const scope = requireRole(await getOrgScope(ctx), "operator");
-    const shipment = await ctx.db.get("shipments", args.shipmentId);
-    if (!shipment) throw new Error("Expédition introuvable");
-    if (shipment.orgId !== scope.orgId) throw new Error("Accès refusé");
-    const update: Record<string, any> = {
-      status: args.status,
-      updatedAt: Date.now(),
-    };
-    if (args.status === "delivered") {
-      update.actualDelivery = Date.now();
-    }
-    await ctx.db.patch("shipments", args.shipmentId, update);
-
-    const eventType =
-      args.status === "pending"
-        ? "created"
-        : args.status === "loading"
-          ? "processed"
-          : args.status;
-    const descriptions: Record<string, string> = {
-      pending: "Expédition enregistrée, en attente de traitement",
-      loading: "Chargement en cours au hub de départ",
-      in_transit: "En route vers le hub de destination",
-      delivered: "Livrée au hub de destination",
-      delayed: "Retard signalé sur le trajet",
-      cancelled: "Expédition annulée",
-    };
-    await recordTrackingEvent(ctx, {
-      orgId: scope.orgId,
-      shipmentId: args.shipmentId,
-      eventType,
-      description: descriptions[args.status],
-    });
+    const shipment = await requireOwned(ctx, "shipments", args.shipmentId, scope.orgId);
+    await applyStatusChange(ctx, shipment, args.status);
     return null;
   },
 });
@@ -285,7 +385,7 @@ export const update = mutation({
     fromHubId: v.optional(v.id("hubs")),
     toHubId: v.optional(v.id("hubs")),
     weight: v.optional(v.number()),
-    priority: v.optional(v.union(v.literal("low"), v.literal("normal"), v.literal("high"), v.literal("urgent"))),
+    priority: v.optional(prioritySchema),
     customerName: v.optional(v.string()),
     customerRef: v.optional(v.union(v.string(), v.null())),
     estimatedDelivery: v.optional(v.union(v.number(), v.null())),
@@ -293,21 +393,40 @@ export const update = mutation({
   returns: v.null(),
   handler: async (ctx, args) => {
     const scope = requireRole(await getOrgScope(ctx), "operator");
-    const shipment = await ctx.db.get("shipments", args.shipmentId);
-    if (!shipment) throw new Error("Expédition introuvable");
-    if (shipment.orgId !== scope.orgId) throw new Error("Accès refusé");
-
-    const patch: Record<string, any> = { updatedAt: Date.now() };
-    if (args.fromHubId !== undefined) patch.fromHubId = args.fromHubId;
-    if (args.toHubId !== undefined) patch.toHubId = args.toHubId;
-    if (args.weight !== undefined) patch.weight = args.weight;
-    if (args.priority !== undefined) patch.priority = args.priority;
-    if (args.customerName !== undefined) patch.customerName = args.customerName;
-    if (args.customerRef !== undefined) {
-      patch.customerRef = args.customerRef;
+    const shipment = await requireOwned(ctx, "shipments", args.shipmentId, scope.orgId);
+    if (isTerminal(shipment.status)) {
+      throw new Error("Une expédition livrée ou annulée n'est plus modifiable");
     }
+
+    const patch: Partial<Doc<"shipments">> = { updatedAt: Date.now() };
+    if (args.fromHubId !== undefined) {
+      await requireOwned(ctx, "hubs", args.fromHubId, scope.orgId);
+      patch.fromHubId = args.fromHubId;
+    }
+    if (args.toHubId !== undefined) {
+      await requireOwned(ctx, "hubs", args.toHubId, scope.orgId);
+      patch.toHubId = args.toHubId;
+    }
+    const fromHubId = patch.fromHubId ?? shipment.fromHubId;
+    const toHubId = patch.toHubId ?? shipment.toHubId;
+    if (fromHubId === toHubId) {
+      throw new Error("Les hubs de départ et d'arrivée doivent être différents");
+    }
+    if (patch.fromHubId !== undefined || patch.toHubId !== undefined) {
+      const route = await resolveRoute(ctx, scope.orgId, fromHubId, toHubId);
+      // undefined dans un patch = suppression du champ (plus d'itinéraire).
+      patch.routeId = route?._id;
+    }
+    if (args.weight !== undefined) {
+      validateWeight(args.weight);
+      patch.weight = args.weight;
+    }
+    if (args.priority !== undefined) patch.priority = args.priority;
+    if (args.customerName !== undefined) patch.customerName = args.customerName.trim();
+    // null = effacement (patch à undefined supprime le champ côté Convex).
+    if (args.customerRef !== undefined) patch.customerRef = args.customerRef ?? undefined;
     if (args.estimatedDelivery !== undefined) {
-      patch.estimatedDelivery = args.estimatedDelivery;
+      patch.estimatedDelivery = args.estimatedDelivery ?? undefined;
     }
     await ctx.db.patch("shipments", args.shipmentId, patch);
     return null;
@@ -380,7 +499,7 @@ export const getById = query({
       shipment,
       fromHub: formatHub(fromHub),
       toHub: formatHub(toHub),
-      route,
+      ...(route ? { route } : {}),
     };
   },
 });

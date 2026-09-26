@@ -2,6 +2,14 @@ import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { getOrgScope, requireRole } from "./orgContext";
 
+function validateHub(h: { capacity: number; currentLoad: number; lat: number; lng: number }) {
+  if (!(h.capacity > 0)) throw new Error("La capacité doit être positive");
+  if (!(h.currentLoad >= 0)) throw new Error("La charge ne peut pas être négative");
+  if (!(Math.abs(h.lat) <= 90) || !(Math.abs(h.lng) <= 180)) {
+    throw new Error("Coordonnées GPS invalides");
+  }
+}
+
 export const list = query({
   args: {},
   returns: v.array(v.object({
@@ -43,7 +51,16 @@ export const create = mutation({
   returns: v.id("hubs"),
   handler: async (ctx, args) => {
     const scope = requireRole(await getOrgScope(ctx), "manager");
-    return await ctx.db.insert("hubs", { ...args, orgId: scope.orgId });
+    validateHub(args);
+    const code = args.code.trim().toUpperCase();
+    const sameCode = await ctx.db
+      .query("hubs")
+      .withIndex("by_code", (q) => q.eq("code", code))
+      .collect();
+    if (sameCode.some((h) => h.orgId === scope.orgId)) {
+      throw new Error(`Le code ${code} est déjà utilisé`);
+    }
+    return await ctx.db.insert("hubs", { ...args, code, orgId: scope.orgId });
   },
 });
 
@@ -66,6 +83,12 @@ export const update = mutation({
     const hub = await ctx.db.get("hubs", args.hubId);
     if (!hub) throw new Error("Entrepôt introuvable");
     if (hub.orgId !== scope.orgId) throw new Error("Accès refusé");
+    validateHub({
+      capacity: args.capacity ?? hub.capacity,
+      currentLoad: args.currentLoad ?? hub.currentLoad,
+      lat: args.lat ?? hub.lat,
+      lng: args.lng ?? hub.lng,
+    });
     const patch: Record<string, any> = {};
     for (const key of ["name", "code", "city", "country", "capacity", "currentLoad", "lat", "lng", "isActive"] as const) {
       if (args[key] !== undefined) patch[key] = args[key];

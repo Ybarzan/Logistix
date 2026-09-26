@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from '@tanstack/react-router'
+import { Link, createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
 import { convexQuery } from '@convex-dev/react-query'
 import { useMutation } from 'convex/react'
@@ -226,7 +226,15 @@ function ShipmentsPage() {
                 onMouseLeave={(e) => (e.currentTarget as HTMLElement).style.background = 'transparent'}
                 onClick={() => navigate({ to: '/expeditions/$shipmentId', params: { shipmentId: s._id } })}
               >
-                <td style={{ padding: '14px 16px', fontFamily: "'DM Mono', monospace", fontSize: '12px', color: '#3b82f6' }}>{s.reference}</td>
+                <td style={{ padding: '14px 16px', fontFamily: "'DM Mono', monospace", fontSize: '12px', color: '#3b82f6' }}>
+                  <Link
+                    to="/expeditions/$shipmentId"
+                    params={{ shipmentId: s._id }}
+                    style={{ color: 'inherit', textDecoration: 'none' }}
+                  >
+                    {s.reference}
+                  </Link>
+                </td>
                 <td style={{ padding: '14px 16px', fontSize: '13px', color: '#c8d0e0' }}>
                   {hubName(s.fromHubId)} → {hubName(s.toHubId)}
                 </td>

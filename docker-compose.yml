@@ -1,0 +1,51 @@
+# Stack LogistiX : backend Convex self-hosted + application web
+#
+# Démarrage :
+#   docker compose up -d --build
+#
+# Variables d'environnement (optionnelles, valeurs par défaut ci-dessous) :
+#   CONVEX_INSTANCE_SECRET  secret d'instance du backend (persisté dans le volume)
+#   VITE_CONVEX_URL         URL du backend vue par le navigateur (build-time)
+#   APP_PORT                port exposé de l'application (défaut 3000)
+
+services:
+  # ---- Backend Convex auto-hébergé ----
+  convex-backend:
+    image: ghcr.io/get-convex/convex-backend:latest
+    container_name: convex-backend
+    restart: unless-stopped
+    environment:
+      # Origines : 3210 = API/admin, 3211 = site (proxy WebSocket, storage)
+      CONVEX_CLOUD_ORIGIN: http://127.0.0.1:3210
+      CONVEX_SITE_ORIGIN: http://127.0.0.1:3211
+      # Secret d'instance : si vide, généré et persisté dans le volume au 1er démarrage.
+      # La clé admin CLI est alors `convex-self-hosted|<secret>`.
+      INSTANCE_SECRET: ${CONVEX_INSTANCE_SECRET:-}
+      DO_NOT_REQUIRE_SSL: "true"
+      RUST_LOG: info
+    ports:
+      - "3210:3210"
+      - "3211:3211"
+    volumes:
+      - convex_data:/convex/data
+
+  # ---- Application LogistiX (TanStack Start + SSR) ----
+  app:
+    build:
+      context: .
+      args:
+        # URL du backend vue par le navigateur (figée au build dans le bundle JS)
+        VITE_CONVEX_URL: ${VITE_CONVEX_URL:-http://127.0.0.1:3210}
+    container_name: logistix-app
+    restart: unless-stopped
+    environment:
+      PORT: 3000
+      HOST: 0.0.0.0
+    ports:
+      - "${APP_PORT:-3000}:3000"
+    depends_on:
+      - convex-backend
+
+volumes:
+  convex_data:
+    name: convex_data

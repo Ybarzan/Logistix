@@ -28,6 +28,8 @@ const emptyForm = {
   customerName: '',
   customerRef: '',
   estimatedDelivery: '',
+  goodsDescription: '',
+  declaredValueEur: '',
 }
 
 function ShipmentsPage() {
@@ -101,6 +103,8 @@ function ShipmentsPage() {
         priority: form.priority as 'low' | 'normal' | 'high' | 'urgent',
         customerName: form.customerName.trim(),
         customerRef: form.customerRef.trim() || undefined,
+        goodsDescription: form.goodsDescription.trim() || undefined,
+        declaredValueEur: form.declaredValueEur ? Number(form.declaredValueEur) : undefined,
         estimatedDelivery: form.estimatedDelivery
           ? new Date(form.estimatedDelivery).getTime()
           : undefined,
@@ -336,6 +340,22 @@ function ShipmentsPage() {
                   type="datetime-local"
                   value={form.estimatedDelivery}
                   onChange={(e) => setForm({ ...form, estimatedDelivery: e.target.value })}
+                />
+              </Field>
+            </div>
+            <div className="field-row">
+              <Field label="Marchandise (pour la douane)">
+                <TextInput
+                  placeholder="ex. Chaises en chêne massif"
+                  value={form.goodsDescription}
+                  onChange={(e) => setForm({ ...form, goodsDescription: e.target.value })}
+                />
+              </Field>
+              <Field label="Valeur déclarée (€)">
+                <NumberInput
+                  min="0"
+                  value={form.declaredValueEur}
+                  onChange={(e) => setForm({ ...form, declaredValueEur: e.target.value })}
                 />
               </Field>
             </div>

@@ -1,72 +1,74 @@
 # LogistiX
 
-Plateforme de supervision logistique : expéditions, hubs, itinéraires, incidents, SLA et traçabilité en temps réel. Interface en français, thème sombre custom.
+Tour de contrôle logistique pour PME : expéditions, hubs, itinéraires, incidents, SLA et traçabilité en temps réel — **qui ne se contente pas d'afficher les problèmes mais aide à les résoudre**. Interface en français, thème sombre custom.
+
+## Ce qui différencie LogistiX
+
+LogistiX est le poste de pilotage d'un écosystème de quatre produits intégrés par API (jamais par base partagée) :
+
+| Brique | Rôle dans la boucle | Contrat |
+|---|---|---|
+| **fleet-hub** (flotte, GPS, tachygraphe) | la position réelle des camions arrive seule | clé `X-Marketplace-Key` du transporteur |
+| **FleetMarket** (bourse de fret PME) | capacité de secours quand le réseau propre ne suffit pas | clé API donneur d'ordre `X-Api-Key` |
+| **Praxio** (moteur de conformité douane) | pré-contrôle douane avant la frontière | clé API `X-API-Key` rattachée à la société |
+
+La boucle : un retard est détecté → LogistiX propose **« trouver un transporteur de secours »** → la charge part sur FleetMarket → des transporteurs dont la conformité est vérifiée par fleet-hub proposent → l'opérateur **retient depuis LogistiX** → le camion du transporteur tiers remonte en GPS via FleetMarket → le client suit tout sur un **lien public**. Pour un envoi hors UE, Praxio classe la marchandise (code SH) et un incident « douane » préventif reste ouvert tant que le code n'est pas confirmé ; chaque confirmation est renvoyée à Praxio, qui apprend de l'historique de la société.
+
+Chaque événement porte sa **provenance** (`manual` / `auto` / `gps`) : un fait télématique se distingue d'une saisie.
 
 ## Stack
 
-- **Backend** — [Convex](https://convex.dev) : base de données, requêtes/mutations/actions, auth par mot de passe (`@convex-dev/auth`), stockage, jobs schedulés.
-- **Frontend** — React 19, [TanStack Router](https://tanstack.com/router) (file-based routing) + TanStack Start, [TanStack Query](https://tanstack.com/query) avec `@convex-dev/react-query` (`useSuspenseQuery`), `convex/react` pour les mutations.
-- **Styling** — CSS custom dans `src/styles/app.css` (pas de Tailwind). Polices Syne + DM Mono, accent `#00d4aa`.
-- **Multi-tenant** — une organisation « LogistiX » (slug `logistix`) ; `orgId` présent sur toutes les tables + index `by_org*`. Le premier compte se rattache paresseusement à cette organisation (voir `convex/orgContext.ts`).
+- **Backend** — [Convex](https://convex.dev) auto-hébergé : base, requêtes/mutations/actions, auth par mot de passe (`@convex-dev/auth`), crons.
+- **Frontend** — React 19, TanStack Router + Start (SSR), TanStack Query via `@convex-dev/react-query`, Leaflet (cartes, chargé côté client uniquement).
+- **Styling** — CSS custom dans `src/styles/app.css`. Polices Syne + DM Mono, accent `#00d4aa`.
+- **Multi-tenant** — `orgId` sur toutes les tables + index `by_org*`. **Chaque inscription crée sa propre organisation** ; on rejoint une équipe uniquement par lien d'invitation (jeton à usage unique + e-mail identique). Aucun repli implicite sur une organisation par défaut.
 
 ## Démarrage
 
-Prérequis : Node ≥ 20, Docker Desktop (backend Convex auto-hébergé).
+Prérequis : Node ≥ 20, Docker Desktop.
 
-### 1. Backend Convex (auto-hébergé sur Docker)
-
-Le backend local écoute sur les ports `3210` (admin) et `3211` (site/proxy). La composition Docker utilisée est documentée en session (`C:\WINDOWS\TEMP\opencode\convex-local\docker-compose.yml`, conteneur `convex-local-backend-1`).
-
-### 2. Configuration
-
-`.env.local` doit contenir :
-
-```
-CONVEX_SELF_HOSTED_URL=http://127.0.0.1:3210
-CONVEX_SELF_HOSTED_ADMIN_KEY=<clé admin générée au démarrage du conteneur>
-VITE_CONVEX_URL=http://127.0.0.1:3210
-VITE_CONVEX_SITE_URL=http://127.0.0.1:3211
-```
-
-> `VITE_CONVEX_URL` doit pointer sur le port **API/admin (3210)** : c'est lui qui répond au WebSocket de synchronisation (`/api/{version}/sync`). `VITE_CONVEX_SITE_URL` (3211) sert pour les URLs de stockage/fichiers.
-
-> **Windows** : définir `CONVEX_TMPDIR` dans un dossier du même volume que le projet (ex. `D:\Users\...\LogistiX\.tmp-convex`) avant toute commande Convex, sinon erreur `ENOENT mkdtemp` (C: et D: sont sur des systèmes de fichiers différents).
-
-### 3. Installation et dev
-
-```
-npm install
-npm run dev        # pousse le code Convex puis lance Vite sur http://localhost:3000
-```
-
-### 4. Peupler la base (seed)
-
-```
-npx convex run seed:seed --typecheck=disable
-```
-
-Crée : 1 organisation, 5 hubs, 4 routes, 20 expéditions (statuts variés sur 7 jours), des événements de suivi et 5 incidents. Non idempotent : ne pas relancer.
+1. **Backend Convex** : `docker compose up -d convex-backend` (image figée par digest), ports `3210` (API/sync) et `3211` (site).
+2. **`.env.local`** :
+   ```
+   CONVEX_SELF_HOSTED_URL=http://127.0.0.1:3210
+   CONVEX_SELF_HOSTED_ADMIN_KEY=<clé admin>
+   VITE_CONVEX_URL=http://127.0.0.1:3210
+   VITE_CONVEX_SITE_URL=http://127.0.0.1:3211
+   ```
+   > **Windows** : définir `CONVEX_TMPDIR` sur le même volume que le projet (ex. `D:\...\LogistiX\.tmp-convex`).
+3. `npm install` puis `npm run dev`.
+4. Données de démo : `npx convex run seed:seed --typecheck=disable` (non idempotent). Pour rattacher un compte existant à l'organisation de démo : `npx convex run organizations:attachUserToOrg '{"email":"…","slug":"logistix","role":"admin"}'`.
+5. Intégrations : **Paramètres** → fleet-hub, FleetMarket, Praxio (URL + clé ; la clé ne quitte jamais le serveur). Depuis le conteneur Convex, les autres stacks locales sont joignables via `http://host.docker.internal:<port>`.
 
 ## Scripts
 
 | Commande | Description |
 |---|---|
 | `npm run dev` | Pousse le code Convex puis lance le dev server |
-| `npm run lint` | `tsc --noEmit` + `eslint` (`--max-warnings 0`) |
-| `npm run build` | `vite build` (client + SSR) puis `tsc --noEmit` |
-| `npm run format` | Prettier |
+| `npm run check` | **À lancer avant chaque commit** : lint + tests + build (code de sortie fiable) |
+| `npm run lint` | `tsc` + `eslint --max-warnings 0` |
+| `npm test` | Tests backend : `convex-test` + vitest (vraies fonctions Convex, base en mémoire) |
+| `npm run build` | `vite build` (client + SSR) puis `tsc` |
 
-## Structure
+La CI GitHub Actions exécute lint, tests et build à chaque push.
 
-- `convex/schema.ts` — tables et index (`organizations`, `users`, `hubs`, `routes`, `shipments`, `trackingEvents`, `incidents`).
-- `convex/*.ts` — modules métier : `auth` (providers), `orgContext` (scope multi-tenant), `shipments`, `hubs`, `routes`, `incidents`, `tracking`, `stats`, `seed`.
-- `convex/http.ts` — endpoints HTTP (health check).
-- `src/routes/` — routes TanStack file-based (`/`, `/login`, `/expeditions`, `/hubs`, `/routes`, `/incidents`, `/sla`, `/performance`, `/tracabilite`, `/expeditions/$shipmentId`).
-- `src/components/` — `form.tsx` (Modal/Field/inputs), `shipmentMeta.ts` (labels, couleurs, formats).
-- `src/routeTree.gen.ts` — généré automatiquement (ne pas éditer).
+## Structure (backend `convex/`)
+
+- `schema.ts` — tables et index.
+- `orgContext.ts` — `getOrgScope` (fail-closed), `requireRole`, `requireOwned` (toute référence par id est vérifiée comme appartenant au tenant).
+- `signup.ts`, `organizations.ts` — organisation à l'inscription, membres, rôles (dernier admin protégé), invitations.
+- `shipments.ts` + `shipmentStatus.ts` — machine à états (livré/annulé terminaux), références `EX-AAAA-NNNNNN`, itinéraire et ETA déduits.
+- `automation.ts` + `crons.ts` — retards (sévérité escaladée, clôture auto), surcharge des hubs, risque douane.
+- `fleethub.ts` — synchro GPS (2 min), cartes, trace de positions.
+- `fleetmarket.ts` — publication de charge, propositions, acceptation, suivi du transporteur retenu.
+- `praxio.ts` + `customsRules.ts` — régime douanier, classification SH, confirmation, incident préventif.
+- `recommendations.ts` — « que faire maintenant » : actions explicables par incident.
+- `publicTracking.ts` — lien de suivi client (`/suivi/<jeton>`), données réduites, révocable.
+- `co2.ts` — CO₂e par expédition (t·km × facteur ; facteur par défaut indicatif, réglable par organisation).
+- `stats.ts` — SLA et performance sur une fenêtre indexée de 90 jours.
 
 ## Conventions
 
-- **Convex** : nouvelle syntaxe (`query`/`mutation`/`action` + `args`/`returns`/`handler`), validators `returns` toujours présents (`v.null()` pour les void), jamais de `undefined` dans les valeurs stockées ni dans les args de `runMutation` (champs optionnels omis, effacement via `null`), pas de `.filter()` Convex → index + `withIndex`.
-- **Frontend** : `useSuspenseQuery` + `convexQuery`, `useMutation`/`useAction` depuis `convex/react`, contenu en français.
-- **Lint** : `npm run lint` doit rester à 0 erreur.
+- **Convex** : validators `returns` toujours présents **et à jour du schéma** (un champ ajouté au schéma doit l'être aux validators qui renvoient le document) ; jamais de `undefined` stocké (omission) — `undefined` dans un `patch` sert à effacer ; pas de `.filter()` Convex → `withIndex`.
+- **Sécurité** : toute mutation passe par `requireRole` ; tout id reçu du client par `requireOwned` ; les clés d'intégration ne sont jamais renvoyées au navigateur.
+- **Frontend** : `useSuspenseQuery` + `convexQuery`, contenu en français.

@@ -17,6 +17,7 @@ export const actionKind = v.union(
   v.literal("track_carrier"),
   v.literal("share_tracking"),
   v.literal("hub_backlog"),
+  v.literal("customs_check"),
   v.literal("open_shipment"),
 );
 
@@ -98,6 +99,13 @@ export const openActions = query({
             kind: "publish_fleetmarket",
             label: "Trouver un transporteur de secours",
             reason: "Publier la charge sur FleetMarket (transporteurs à conformité vérifiée).",
+          });
+        }
+        if (inc.type === "customs" && !shipment.customs?.confirmedHsCode) {
+          actions.push({
+            kind: "customs_check",
+            label: "Préparer la douane",
+            reason: "Classer la marchandise (code SH via Praxio) avant le passage de frontière.",
           });
         }
         if (inc.type === "delay") {

@@ -28,6 +28,18 @@ export const fleetmarketLinkSchema = v.object({
   carrierComplianceScore: v.optional(v.number()),
 });
 
+export const customsSchema = v.object({
+  suggestions: v.array(
+    v.object({ code: v.string(), description: v.optional(v.string()), confidence: v.optional(v.number()) }),
+  ),
+  // Identifiant de la suggestion côté Praxio (pour lui renvoyer la confirmation).
+  praxioSuggestionId: v.optional(v.string()),
+  checkedAt: v.number(),
+  confirmedHsCode: v.optional(v.string()),
+  confirmedAt: v.optional(v.number()),
+  error: v.optional(v.string()),
+});
+
 export const eventSourceSchema = v.union(
   v.literal("manual"),
   v.literal("auto"),
@@ -137,6 +149,10 @@ export default defineSchema({
     fleetmarket: v.optional(fleetmarketLinkSchema),
     // Secret du lien de suivi public destiné au client final (/suivi/<token>).
     trackingToken: v.optional(v.string()),
+    // Marchandise (pour la douane) et pré-contrôle douane via Praxio.
+    goodsDescription: v.optional(v.string()),
+    declaredValueEur: v.optional(v.number()),
+    customs: v.optional(customsSchema),
     orgId: v.optional(v.id("organizations")),
   }).index("by_reference", ["reference"])
     .index("by_tracking_token", ["trackingToken"])
@@ -235,6 +251,17 @@ export default defineSchema({
     apiKey: v.string(),
     enabled: v.boolean(),
     lastSyncAt: v.optional(v.number()),
+    lastError: v.optional(v.string()),
+  }).index("by_org", ["orgId"]),
+
+  // Connexion à Praxio (moteur de conformité douane), clé API rattachée
+  // à la société Praxio de l'organisation.
+  praxioIntegrations: defineTable({
+    orgId: v.id("organizations"),
+    baseUrl: v.string(),
+    apiKey: v.string(),
+    enabled: v.boolean(),
+    lastCallAt: v.optional(v.number()),
     lastError: v.optional(v.string()),
   }).index("by_org", ["orgId"]),
 });

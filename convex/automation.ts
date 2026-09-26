@@ -216,6 +216,7 @@ export const runAutomation = internalAction({
     for (const orgId of orgIds) {
       await ctx.runMutation(internal.automation.detectDelaysForOrg, { orgId, now });
       await ctx.runMutation(internal.automation.detectHubOverloadForOrg, { orgId, now });
+      await ctx.runMutation(internal.praxio.detectCustomsRiskForOrg, { orgId, now });
     }
     return null;
   },

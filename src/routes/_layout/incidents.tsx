@@ -5,6 +5,7 @@ import { useMutation } from 'convex/react'
 import { useState } from 'react'
 import { api } from '../../../convex/_generated/api'
 import { Field, Modal, Select, TextArea, TextInput } from '../../components/form'
+import { RecommendedActions } from '../../components/RecommendedActions'
 import { incidentTypeLabels, severityColors } from '../../components/shipmentMeta'
 import { can } from '../../components/rbac'
 import type { Id } from '../../../convex/_generated/dataModel'
@@ -25,6 +26,8 @@ function IncidentsPage() {
   const queryClient = useQueryClient()
   const { data: incidents } = useSuspenseQuery(convexQuery(api.incidents.list, {}))
   const { data: currentUser } = useSuspenseQuery(convexQuery(api.organizations.currentUser, {}))
+  const { data: recommendations } = useSuspenseQuery(convexQuery(api.recommendations.openActions, { limit: 100 }))
+  const recByIncident = new Map(recommendations.map((r) => [r.incidentId as string, r]))
   const createIncident = useMutation(api.incidents.create)
   const resolveIncident = useMutation(api.incidents.resolve)
   const updateIncident = useMutation(api.incidents.update)
@@ -213,6 +216,9 @@ function IncidentsPage() {
                     <span>{incidentTypeLabels[incident.type]}</span>
                     <span>{new Date(incident.createdAt).toLocaleString('fr-FR')}</span>
                   </div>
+                  {incident.status !== 'resolved' && recByIncident.get(incident._id) && (
+                    <RecommendedActions item={recByIncident.get(incident._id)!} canAct={canCreate} />
+                  )}
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'flex-end' }}>
                   {incident.status !== 'resolved' && (

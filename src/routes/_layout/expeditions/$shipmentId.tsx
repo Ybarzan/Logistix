@@ -16,7 +16,7 @@ import {
 } from '../../../components/shipmentMeta'
 import { can } from '../../../components/rbac'
 import { LiveMap } from '../../../components/LiveMap'
-import { ClientLinkPanel, Co2Row, FleetMarketPanel } from '../../../components/ShipmentPanels'
+import { ClientLinkPanel, Co2Row, CustomsPanel, FleetMarketPanel } from '../../../components/ShipmentPanels'
 import { SHIPMENT_TRANSITIONS, isTerminal } from '../../../../convex/shipmentStatus'
 import type { ShipmentStatus } from '../../../../convex/shipmentStatus'
 import type { Id } from '../../../../convex/_generated/dataModel'
@@ -52,7 +52,7 @@ function ShipmentDetailPage() {
 
   const [showEdit, setShowEdit] = useState(false)
   const [showEvent, setShowEvent] = useState(false)
-  const [editForm, setEditForm] = useState({ weight: '', priority: 'normal', customerName: '', customerRef: '', estimatedDelivery: '' })
+  const [editForm, setEditForm] = useState({ weight: '', priority: 'normal', customerName: '', customerRef: '', estimatedDelivery: '', goodsDescription: '', declaredValueEur: '' })
   const [eventForm, setEventForm] = useState({ eventType: 'custom', description: '', location: '' })
   const [error, setError] = useState<string | null>(null)
 
@@ -91,6 +91,8 @@ function ShipmentDetailPage() {
       estimatedDelivery: shipment.estimatedDelivery
         ? new Date(shipment.estimatedDelivery).toISOString().slice(0, 16)
         : '',
+      goodsDescription: shipment.goodsDescription ?? '',
+      declaredValueEur: shipment.declaredValueEur !== undefined ? String(shipment.declaredValueEur) : '',
     })
     setShowEdit(true)
   }
@@ -104,6 +106,8 @@ function ShipmentDetailPage() {
         priority: editForm.priority as 'low' | 'normal' | 'high' | 'urgent',
         customerName: editForm.customerName.trim() || undefined,
         customerRef: editForm.customerRef.trim() || null,
+        goodsDescription: editForm.goodsDescription.trim() || null,
+        declaredValueEur: editForm.declaredValueEur ? Number(editForm.declaredValueEur) : null,
         estimatedDelivery: editForm.estimatedDelivery
           ? new Date(editForm.estimatedDelivery).getTime()
           : null,
@@ -281,6 +285,7 @@ function ShipmentDetailPage() {
             </div>
           </div>
 
+          <CustomsPanel shipment={shipment} canEdit={canEdit} />
           <FleetMarketPanel shipment={shipment} canEdit={canEdit} />
           <ClientLinkPanel shipment={shipment} canEdit={canEdit} />
 
@@ -363,6 +368,14 @@ function ShipmentDetailPage() {
               </Field>
               <Field label="Livraison estimée">
                 <TextInput type="datetime-local" value={editForm.estimatedDelivery} onChange={(e) => setEditForm({ ...editForm, estimatedDelivery: e.target.value })} />
+              </Field>
+            </div>
+            <div className="field-row">
+              <Field label="Marchandise (pour la douane)">
+                <TextInput value={editForm.goodsDescription} onChange={(e) => setEditForm({ ...editForm, goodsDescription: e.target.value })} />
+              </Field>
+              <Field label="Valeur déclarée (€)">
+                <NumberInput min="0" value={editForm.declaredValueEur} onChange={(e) => setEditForm({ ...editForm, declaredValueEur: e.target.value })} />
               </Field>
             </div>
             {error && <div className="auth-error">{error}</div>}

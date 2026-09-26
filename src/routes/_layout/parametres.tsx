@@ -182,6 +182,7 @@ function SettingsPage() {
 
       <FleethubCard isAdmin={isAdmin} canSync={can(currentUser?.role, 'operator')} />
       <FleetMarketCard isAdmin={isAdmin} />
+      <PraxioCard isAdmin={isAdmin} />
       <Co2Card isAdmin={isAdmin} />
 
       {isAdmin && invitations.length > 0 && (
@@ -413,6 +414,78 @@ function Co2Card({ isAdmin }: { isAdmin: boolean }) {
           </Field>
           <button type="submit" className="btn btn-primary" style={{ marginBottom: '12px' }}>Enregistrer</button>
         </form>
+      )}
+    </div>
+  )
+}
+
+function PraxioCard({ isAdmin }: { isAdmin: boolean }) {
+  const { data: config } = useSuspenseQuery(convexQuery(api.praxio.getConfig, {}))
+  const save = useMutation(api.praxio.saveConfig)
+  const [form, setForm] = useState({
+    baseUrl: config?.baseUrl ?? 'http://host.docker.internal:8081',
+    apiKey: '',
+    enabled: config?.enabled ?? true,
+  })
+  const [error, setError] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+
+  const submit = async (e: FormEvent) => {
+    e.preventDefault()
+    setBusy(true)
+    setError(null)
+    try {
+      await save({ baseUrl: form.baseUrl, enabled: form.enabled, ...(form.apiKey.trim() ? { apiKey: form.apiKey.trim() } : {}) })
+      setForm({ ...form, apiKey: '' })
+    } catch (err) {
+      setError(errorMessage(err))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="card" style={{ marginTop: '14px' }}>
+      <div className="card-title">
+        Intégration Praxio <span className="card-tag">conformité douane</span>
+      </div>
+      <div className="page-sub" style={{ marginBottom: '12px' }}>
+        Classification SH des marchandises pour les envois transfrontaliers, et incident préventif tant qu&apos;un envoi
+        hors UE n&apos;a pas de code confirmé. Chaque confirmation est renvoyée à Praxio pour affiner sa classification.
+        Clé API : Praxio → Paramètres → Clés API (rattachée à votre société).
+      </div>
+      {error && <div className="auth-error">{error}</div>}
+      {isAdmin ? (
+        <form onSubmit={submit}>
+          <div className="field-row">
+            <Field label="URL Praxio">
+              <TextInput value={form.baseUrl} onChange={(e) => setForm({ ...form, baseUrl: e.target.value })} />
+            </Field>
+            <Field label={config ? `Clé API (actuelle ${config.keyHint})` : 'Clé API Praxio'}>
+              <input
+                className="input"
+                type="password"
+                autoComplete="off"
+                placeholder={config ? 'Laisser vide pour conserver' : 'ic_live_…'}
+                value={form.apiKey}
+                onChange={(e) => setForm({ ...form, apiKey: e.target.value })}
+              />
+            </Field>
+          </div>
+          <label className="field-label" style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '12px' }}>
+            <input type="checkbox" checked={form.enabled} onChange={(e) => setForm({ ...form, enabled: e.target.checked })} />
+            Intégration active
+          </label>
+          <button type="submit" className="btn btn-primary" disabled={busy}>Enregistrer</button>
+        </form>
+      ) : (
+        !config && <div className="empty-state">Non configurée. Demandez à un administrateur.</div>
+      )}
+      {config && (
+        <div className="status-line">
+          {config.enabled ? 'Active' : 'Désactivée'} · dernier appel : {config.lastCallAt ? formatDateTime(config.lastCallAt) : 'jamais'}
+          {config.lastError && <><br /><span className="err">Erreur : {config.lastError}</span></>}
+        </div>
       )}
     </div>
   )

@@ -243,3 +243,107 @@ export function Co2Row({ shipmentId }: { shipmentId: Id<'shipments'> }) {
     </div>
   )
 }
+
+/** Pré-contrôle douane : régime, check-list, classification Praxio, confirmation. */
+export function CustomsPanel({ shipment, canEdit }: { shipment: Doc<'shipments'>; canEdit: boolean }) {
+  const { data: status } = useSuspenseQuery(convexQuery(api.praxio.status, { shipmentId: shipment._id }))
+  const classify = useAction(api.praxio.classify)
+  const confirm = useMutation(api.praxio.confirmHsCode)
+  const [manual, setManual] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  if (!status || status.regime === 'domestic') return null
+  const customs = shipment.customs
+  const terminal = shipment.status === 'delivered' || shipment.status === 'cancelled'
+
+  const run = async (fn: () => Promise<unknown>) => {
+    setBusy(true)
+    setError(null)
+    try {
+      await fn()
+    } catch (err) {
+      setError(cleanError(err))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="card">
+      <div className="card-title">
+        Douane
+        <span className="card-tag">{status.regime === 'extra_eu' ? 'hors UE' : status.regime === 'intra_eu' ? 'intra-UE' : 'à vérifier'}</span>
+      </div>
+      <div className="page-sub" style={{ marginBottom: '10px' }}>{status.regimeLabel}</div>
+      {status.checklist.length > 0 && (
+        <ul className="checklist">
+          {status.checklist.map((c) => (
+            <li key={c.label} className={c.ok ? 'ok' : ''}>{c.ok ? '✓' : '○'} {c.label}</li>
+          ))}
+        </ul>
+      )}
+      {error && <div className="auth-error">{error}</div>}
+      {customs?.error && <div className="auth-error">{customs.error}</div>}
+
+      {customs?.confirmedHsCode ? (
+        <div className="info-list">
+          <div className="info-row">
+            <span className="info-label">Code SH confirmé</span>
+            <span className="info-value mono">{customs.confirmedHsCode}</span>
+          </div>
+        </div>
+      ) : (
+        canEdit && !terminal && (
+          <>
+            {customs && customs.suggestions.length > 0 && (
+              <table className="data-table" style={{ marginBottom: '10px' }}>
+                <tbody>
+                  {customs.suggestions.map((sug) => (
+                    <tr key={sug.code}>
+                      <td className="mono">{sug.code}</td>
+                      <td>{sug.description ?? ''}</td>
+                      <td className="mono">{sug.confidence !== undefined ? `${Math.round(sug.confidence * 100)}%` : ''}</td>
+                      <td style={{ textAlign: 'right' }}>
+                        {sug.code.replace(/\D/g, '').length >= 6 ? (
+                          <button type="button" className="btn btn-sm btn-primary" disabled={busy}
+                            onClick={() => void run(() => confirm({ shipmentId: shipment._id, code: sug.code }))}>
+                            Confirmer
+                          </button>
+                        ) : (
+                          // Position à 4 chiffres : insuffisante pour déclarer, on la fait compléter.
+                          <button type="button" className="btn btn-sm" title="Position à 4 chiffres : complétez au moins la sous-position (6 chiffres)"
+                            onClick={() => setManual(sug.code)}>
+                            Préciser
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              {status.praxioEnabled && (
+                <button type="button" className="btn btn-sm" disabled={busy || !shipment.goodsDescription}
+                  title={shipment.goodsDescription ? undefined : 'Décrivez la marchandise (Modifier)'}
+                  onClick={() => void run(() => classify({ shipmentId: shipment._id }))}>
+                  {customs ? 'Reclasser avec Praxio' : 'Classer avec Praxio'}
+                </button>
+              )}
+              <input className="input" style={{ maxWidth: '160px' }} placeholder="ou code SH manuel" value={manual}
+                onChange={(e) => setManual(e.target.value)} />
+              <button type="button" className="btn btn-sm" disabled={busy || !manual.trim()}
+                onClick={() => void run(() => confirm({ shipmentId: shipment._id, code: manual }).then(() => setManual('')))}>
+                Confirmer
+              </button>
+            </div>
+            {!status.praxioEnabled && (
+              <div className="status-line">Connectez Praxio (Paramètres) pour obtenir une classification SH automatique.</div>
+            )}
+          </>
+        )
+      )}
+    </div>
+  )
+}

@@ -3,7 +3,7 @@ import { mutation, query } from "./_generated/server";
 import { getOrgScope, requireOwned, requireRole } from "./orgContext";
 import { recordTrackingEvent } from "./tracking";
 import { canTransition, formatShipmentReference, isTerminal } from "./shipmentStatus";
-import { fleetmarketLinkSchema, positionSchema } from "./schema";
+import { customsSchema, fleetmarketLinkSchema, positionSchema } from "./schema";
 import type { ShipmentStatus } from "./shipmentStatus";
 import type { MutationCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
@@ -44,6 +44,9 @@ const shipmentFields = v.object({
   lastPosition: v.optional(positionSchema),
   fleetmarket: v.optional(fleetmarketLinkSchema),
   trackingToken: v.optional(v.string()),
+  goodsDescription: v.optional(v.string()),
+  declaredValueEur: v.optional(v.number()),
+  customs: v.optional(customsSchema),
   orgId: v.optional(v.id("organizations")),
 });
 
@@ -268,6 +271,8 @@ export const create = mutation({
     customerName: v.string(),
     customerRef: v.optional(v.string()),
     estimatedDelivery: v.optional(v.number()),
+    goodsDescription: v.optional(v.string()),
+    declaredValueEur: v.optional(v.number()),
   },
   returns: v.id("shipments"),
   handler: async (ctx, args) => {
@@ -302,6 +307,10 @@ export const create = mutation({
       ...(route ? { routeId: route._id } : {}),
       ...(args.customerRef !== undefined ? { customerRef: args.customerRef } : {}),
       ...(estimatedDelivery !== undefined ? { estimatedDelivery } : {}),
+      ...(args.goodsDescription?.trim() ? { goodsDescription: args.goodsDescription.trim() } : {}),
+      ...(args.declaredValueEur !== undefined && args.declaredValueEur > 0
+        ? { declaredValueEur: args.declaredValueEur }
+        : {}),
     });
     await recordTrackingEvent(ctx, {
       orgId: scope.orgId,
@@ -395,6 +404,8 @@ export const update = mutation({
     customerName: v.optional(v.string()),
     customerRef: v.optional(v.union(v.string(), v.null())),
     estimatedDelivery: v.optional(v.union(v.number(), v.null())),
+    goodsDescription: v.optional(v.union(v.string(), v.null())),
+    declaredValueEur: v.optional(v.union(v.number(), v.null())),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -433,6 +444,20 @@ export const update = mutation({
     if (args.customerRef !== undefined) patch.customerRef = args.customerRef ?? undefined;
     if (args.estimatedDelivery !== undefined) {
       patch.estimatedDelivery = args.estimatedDelivery ?? undefined;
+    }
+    if (args.goodsDescription !== undefined) {
+      const goods = args.goodsDescription?.trim() || undefined;
+      if (goods !== shipment.goodsDescription) {
+        patch.goodsDescription = goods;
+        // La classification portait sur l'ancienne description : elle n'est plus valable.
+        patch.customs = undefined;
+      }
+    }
+    if (args.declaredValueEur !== undefined) {
+      if (args.declaredValueEur !== null && !(args.declaredValueEur > 0)) {
+        throw new Error("La valeur déclarée doit être positive");
+      }
+      patch.declaredValueEur = args.declaredValueEur ?? undefined;
     }
     await ctx.db.patch("shipments", args.shipmentId, patch);
     return null;

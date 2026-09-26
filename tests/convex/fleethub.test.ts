@@ -7,25 +7,27 @@ const SECRET = "mk_test_secret_value_1234";
 
 function stubFleethub(opts: { status?: number; lat?: number; gpsAt?: string } = {}) {
   const calls: Array<{ url: string; key: string | null }> = [];
-  vi.stubGlobal("fetch", async (url: string, init?: RequestInit) => {
+  vi.stubGlobal("fetch", (url: string, init?: RequestInit): Promise<Response> => {
     const headers = new Headers(init?.headers);
     calls.push({ url, key: headers.get("X-Marketplace-Key") });
-    if (opts.status && opts.status !== 200) return new Response("", { status: opts.status });
+    if (opts.status && opts.status !== 200) {
+      return Promise.resolve(new Response("", { status: opts.status }));
+    }
     if (url.includes("/availability")) {
-      return Response.json({
+      return Promise.resolve(Response.json({
         companyName: "Transports Test",
         complianceScore: 94,
         trucksAvailable: [{ truckId: 1, registration: "AB-123-CD", capacityTons: 19 }],
-      });
+      }));
     }
-    return Response.json({
+    return Promise.resolve(Response.json({
       registration: "GPS-01",
       available: true,
       latitude: opts.lat ?? 45.764,
       longitude: 4.8357,
       speedKph: 72,
       lastGpsUpdate: opts.gpsAt ?? "2026-09-26T10:00:00",
-    });
+    }));
   });
   return calls;
 }

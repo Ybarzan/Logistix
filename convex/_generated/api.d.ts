@@ -11,6 +11,7 @@
 import type * as auth from "../auth.js";
 import type * as automation from "../automation.js";
 import type * as crons from "../crons.js";
+import type * as fleethub from "../fleethub.js";
 import type * as http from "../http.js";
 import type * as hubs from "../hubs.js";
 import type * as incidents from "../incidents.js";
@@ -34,6 +35,7 @@ declare const fullApi: ApiFromModules<{
   auth: typeof auth;
   automation: typeof automation;
   crons: typeof crons;
+  fleethub: typeof fleethub;
   http: typeof http;
   hubs: typeof hubs;
   incidents: typeof incidents;

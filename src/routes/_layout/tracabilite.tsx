@@ -78,7 +78,7 @@ function TracingPage() {
                     {eventLabels[event.eventType]}
                   </span>
                 </div>
-                <div className="feed-desc">{event.description}</div>
+                <div className="feed-desc">{event.description}{event.source && event.source !== 'manual' && <span className={`source-tag ${event.source}`}>{event.source === 'gps' ? 'GPS' : 'Auto'}</span>}</div>
                 <div className="feed-meta">
                   <span>{event.fromCity} → {event.toCity}</span>
                   <span>{formatDateTime(event._creationTime)}</span>

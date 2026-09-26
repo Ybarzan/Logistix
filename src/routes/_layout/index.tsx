@@ -126,7 +126,7 @@ function Dashboard() {
                       {i < recentEvents.length - 1 && <div className="tl-line" />}
                     </div>
                     <div className="tl-content">
-                      <div className="tl-event">{event.description}</div>
+                      <div className="tl-event">{event.description}{event.source && event.source !== 'manual' && <span className={`source-tag ${event.source}`}>{event.source === 'gps' ? 'GPS' : 'Auto'}</span>}</div>
                       <div className="tl-time">
                         {formatDateTime(event._creationTime)} · {event.fromCity} → {event.toCity}
                         {event.location ? ` · ${event.location}` : ''}

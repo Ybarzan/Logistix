@@ -206,3 +206,20 @@ body { font-family: 'Syne', sans-serif; background: #080b10; color: #e8eaf0; min
 .mono { font-family: 'DM Mono', monospace; font-size: 12px; }
 .invite-link { margin-top: 14px; padding-top: 14px; border-top: 1px solid #1e2535; }
 @media (max-width: 900px) { .grid-2, .field-row { grid-template-columns: 1fr; } }
+
+/* Carte temps réel (Leaflet) */
+.live-map { width: 100%; border-radius: 10px; overflow: hidden; background: #080b10; border: 1px solid #1e2535; z-index: 0; }
+.live-map .leaflet-tooltip { background: #0d1017; color: #c8d0e0; border: 1px solid #1e2535; font-family: 'DM Mono', monospace; font-size: 11px; box-shadow: none; }
+.live-map .leaflet-tooltip-top:before { border-top-color: #1e2535; }
+.live-map .leaflet-control-attribution { background: #080b10cc; color: #3d4a5c; font-size: 9px; }
+.live-map .leaflet-control-attribution a { color: #6b7a99; }
+.live-map .leaflet-bar a { background: #0d1017; color: #c8d0e0; border-bottom-color: #1e2535; }
+@keyframes truck-pulse { 0% { stroke-opacity: 1; stroke-width: 3; } 70% { stroke-opacity: 0; stroke-width: 14; } 100% { stroke-opacity: 0; stroke-width: 3; } }
+.truck-pulse { animation: truck-pulse 2s ease-out infinite; }
+@media (prefers-reduced-motion: reduce) { .truck-pulse { animation: none; } }
+.source-tag { font-family: 'DM Mono', monospace; font-size: 9px; text-transform: uppercase; letter-spacing: .06em; padding: 1px 6px; border-radius: 6px; margin-left: 6px; }
+.source-tag.gps { color: #00d4aa; background: #00d4aa14; }
+.source-tag.auto { color: #f59e0b; background: #f59e0b14; }
+.status-line { font-family: 'DM Mono', monospace; font-size: 11px; color: #6b7a99; margin-top: 10px; line-height: 1.7; }
+.status-line .err { color: #ff8fa3; }
+.live-map .leaflet-tile-pane { filter: invert(1) hue-rotate(180deg) brightness(.8) contrast(.9) saturate(.6); }

@@ -6,6 +6,7 @@ import { useState } from 'react'
 import { api } from '../../../convex/_generated/api'
 import { Field, Modal, NumberInput, Select, TextInput } from '../../components/form'
 import { can } from '../../components/rbac'
+import { LiveMap } from '../../components/LiveMap'
 import type { Id } from '../../../convex/_generated/dataModel'
 import type { FormEvent } from 'react'
 
@@ -103,6 +104,7 @@ function HubCard({
 function HubsPage() {
   const queryClient = useQueryClient()
   const { data: hubs } = useSuspenseQuery(convexQuery(api.hubs.list, {}))
+  const { data: network } = useSuspenseQuery(convexQuery(api.fleethub.networkMap, {}))
   const { data: currentUser } = useSuspenseQuery(convexQuery(api.organizations.currentUser, {}))
   const createHub = useMutation(api.hubs.create)
   const updateHub = useMutation(api.hubs.update)
@@ -226,18 +228,24 @@ function HubsPage() {
       )}
 
       <div className="card" style={{ marginTop: '14px' }}>
-        <div className="card-title">Carte du réseau</div>
-        <div className="map-box" style={{ height: '280px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div style={{ textAlign: 'center', color: '#3d4a5c' }}>
-            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" style={{ opacity: 0.5 }}>
-              <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z" />
-              <circle cx="12" cy="10" r="3" />
-            </svg>
-            <div style={{ marginTop: '12px', fontSize: '12px', fontFamily: "'DM Mono', monospace" }}>
-              Carte des hubs en temps réel
-            </div>
-          </div>
+        <div className="card-title">
+          Carte du réseau
+          <span className="card-tag">{network.trucks.length} camion(s) suivi(s) en GPS</span>
         </div>
+        <LiveMap
+          height={340}
+          hubs={network.hubs.map((h) => ({
+            id: h._id, lat: h.lat, lng: h.lng, label: `${h.code} · ${h.name}`, loadPct: h.loadPct, muted: !h.isActive,
+          }))}
+          trucks={network.trucks.map((t) => ({
+            id: t.shipmentId,
+            lat: t.lat,
+            lng: t.lng,
+            label: `${t.registration} · ${t.reference}`,
+            href: `/expeditions/${t.shipmentId}`,
+            stale: Date.now() - t.recordedAt > 30 * 60 * 1000,
+          }))}
+        />
       </div>
 
       {showCreate && (

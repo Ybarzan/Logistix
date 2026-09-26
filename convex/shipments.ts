@@ -3,6 +3,7 @@ import { mutation, query } from "./_generated/server";
 import { getOrgScope, requireOwned, requireRole } from "./orgContext";
 import { recordTrackingEvent } from "./tracking";
 import { canTransition, formatShipmentReference, isTerminal } from "./shipmentStatus";
+import { positionSchema } from "./schema";
 import type { ShipmentStatus } from "./shipmentStatus";
 import type { MutationCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
@@ -39,6 +40,8 @@ const shipmentFields = v.object({
   actualDelivery: v.optional(v.number()),
   createdAt: v.number(),
   updatedAt: v.optional(v.number()),
+  truckRegistration: v.optional(v.string()),
+  lastPosition: v.optional(positionSchema),
   orgId: v.optional(v.id("organizations")),
 });
 
@@ -326,7 +329,7 @@ export async function applyStatusChange(
   ctx: MutationCtx,
   shipment: Doc<"shipments">,
   status: ShipmentStatus,
-  description?: string,
+  opts: { description?: string; source?: "manual" | "auto" | "gps" } = {},
 ): Promise<void> {
   if (!canTransition(shipment.status, status)) {
     throw new Error(`Transition interdite : ${shipment.status} → ${status}`);
@@ -345,7 +348,8 @@ export async function applyStatusChange(
     orgId,
     shipmentId: shipment._id,
     eventType,
-    description: description ?? statusDescriptions[status],
+    description: opts.description ?? statusDescriptions[status],
+    source: opts.source ?? "manual",
   });
 
   if (isTerminal(status)) {

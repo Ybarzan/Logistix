@@ -180,6 +180,8 @@ function SettingsPage() {
         </table>
       </div>
 
+      <FleethubCard isAdmin={isAdmin} canSync={can(currentUser?.role, 'operator')} />
+
       {isAdmin && invitations.length > 0 && (
         <div className="card" style={{ marginTop: '14px' }}>
           <div className="card-title">Invitations en attente</div>
@@ -210,5 +212,91 @@ function SettingsPage() {
         </div>
       )}
     </>
+  )
+}
+
+function FleethubCard({ isAdmin, canSync }: { isAdmin: boolean; canSync: boolean }) {
+  const { data: config } = useSuspenseQuery(convexQuery(api.fleethub.getConfig, {}))
+  const save = useMutation(api.fleethub.saveConfig)
+  const syncNow = useMutation(api.fleethub.syncNow)
+  const [form, setForm] = useState({
+    baseUrl: config?.baseUrl ?? 'http://host.docker.internal:8888',
+    apiKey: '',
+    enabled: config?.enabled ?? true,
+  })
+  const [error, setError] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+
+  const submit = async (e: FormEvent) => {
+    e.preventDefault()
+    setBusy(true)
+    setError(null)
+    try {
+      await save({
+        baseUrl: form.baseUrl,
+        enabled: form.enabled,
+        ...(form.apiKey.trim() ? { apiKey: form.apiKey.trim() } : {}),
+      })
+      setForm({ ...form, apiKey: '' })
+    } catch (err) {
+      setError(errorMessage(err))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="card" style={{ marginTop: '14px' }}>
+      <div className="card-title">
+        Intégration fleet-hub <span className="card-tag">GPS temps réel</span>
+      </div>
+      <div className="page-sub" style={{ marginBottom: '12px' }}>
+        Positions réelles des camions affectés aux expéditions, synchronisées toutes les 2 minutes
+        via la clé de partage fleet-hub du transporteur (fleet-hub → Marketplace → « Activer le partage »).
+      </div>
+      {error && <div className="auth-error">{error}</div>}
+      {isAdmin && (
+        <form onSubmit={submit}>
+          <div className="field-row">
+            <Field label="URL fleet-hub">
+              <TextInput value={form.baseUrl} onChange={(e) => setForm({ ...form, baseUrl: e.target.value })} />
+            </Field>
+            <Field label={config ? `Clé de partage (actuelle ${config.keyHint})` : 'Clé de partage'}>
+              <input
+                className="input"
+                type="password"
+                autoComplete="off"
+                placeholder={config ? 'Laisser vide pour conserver' : 'X-Marketplace-Key'}
+                value={form.apiKey}
+                onChange={(e) => setForm({ ...form, apiKey: e.target.value })}
+              />
+            </Field>
+          </div>
+          <label className="field-label" style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '12px' }}>
+            <input type="checkbox" checked={form.enabled} onChange={(e) => setForm({ ...form, enabled: e.target.checked })} />
+            Synchronisation active
+          </label>
+          <button type="submit" className="btn btn-primary" disabled={busy}>Enregistrer et synchroniser</button>
+        </form>
+      )}
+      {config && (
+        <div className="status-line">
+          {config.companyName ? <>Société : <strong>{config.companyName}</strong> · </> : null}
+          {config.complianceScore !== undefined ? <>conformité {config.complianceScore}% · </> : null}
+          {config.vehicleCount} camion(s) disponible(s)
+          <br />
+          Dernière synchro : {config.lastSyncAt ? formatDateTime(config.lastSyncAt) : 'jamais'}
+          {config.lastError && <><br /><span className="err">Erreur : {config.lastError}</span></>}
+          {canSync && (
+            <div style={{ marginTop: '8px' }}>
+              <button type="button" className="btn btn-sm" onClick={() => void syncNow({}).catch((err: unknown) => setError(errorMessage(err)))}>
+                Synchroniser maintenant
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+      {!config && !isAdmin && <div className="empty-state">Non configurée. Demandez à un administrateur.</div>}
+    </div>
   )
 }

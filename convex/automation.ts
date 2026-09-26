@@ -138,7 +138,10 @@ export const detectDelaysForOrg = internalMutation({
             ctx,
             shipment,
             "delayed",
-            `Retard détecté automatiquement (${formatOverrun(overrunMs)})`,
+            {
+              description: `Retard détecté automatiquement (${formatOverrun(overrunMs)})`,
+              source: "auto",
+            },
           );
         }
       }

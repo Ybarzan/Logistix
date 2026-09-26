@@ -15,6 +15,7 @@ import {
   statusLabels,
 } from '../../../components/shipmentMeta'
 import { can } from '../../../components/rbac'
+import { LiveMap } from '../../../components/LiveMap'
 import { SHIPMENT_TRANSITIONS, isTerminal } from '../../../../convex/shipmentStatus'
 import type { ShipmentStatus } from '../../../../convex/shipmentStatus'
 import type { Id } from '../../../../convex/_generated/dataModel'
@@ -39,6 +40,13 @@ function ShipmentDetailPage() {
   const updateStatus = useMutation(api.shipments.updateStatus)
   const updateShipment = useMutation(api.shipments.update)
   const logEvent = useMutation(api.tracking.log)
+  const assignTruck = useMutation(api.fleethub.assignTruck)
+  const { data: vehicles } = useSuspenseQuery(convexQuery(api.fleethub.listVehicles, {}))
+  const { data: trail } = useSuspenseQuery(
+    convexQuery(api.fleethub.positionTrail, { shipmentId: shipmentId as Id<'shipments'> }),
+  )
+  const { data: network } = useSuspenseQuery(convexQuery(api.fleethub.networkMap, {}))
+  const [truckInput, setTruckInput] = useState('')
   const canEdit = can(currentUser?.role, 'operator')
 
   const [showEdit, setShowEdit] = useState(false)
@@ -201,6 +209,76 @@ function ShipmentDetailPage() {
             </div>
           </div>
 
+          <div className="card">
+            <div className="card-title">
+              Camion &amp; position
+              {shipment.lastPosition && (
+                <span className="card-tag">
+                  GPS · {formatDateTime(shipment.lastPosition.recordedAt)}
+                  {shipment.lastPosition.speedKph !== undefined ? ` · ${Math.round(shipment.lastPosition.speedKph)} km/h` : ''}
+                </span>
+              )}
+            </div>
+            <div className="info-list">
+              <div className="info-row">
+                <span className="info-label">Camion</span>
+                <span className="info-value mono">{shipment.truckRegistration ?? 'Non affecté'}</span>
+              </div>
+            </div>
+            {canEdit && !isTerminal(shipment.status) && (
+              <form
+                style={{ display: 'flex', gap: '8px', marginTop: '10px' }}
+                onSubmit={(e) => {
+                  e.preventDefault()
+                  void assignTruck({ shipmentId: shipment._id, registration: truckInput.trim() || null })
+                    .then(() => { setTruckInput(''); setError(null) })
+                    .catch((err: unknown) => setError(err instanceof Error ? err.message : 'Erreur'))
+                }}
+              >
+                <input
+                  className="input"
+                  list="fleet-vehicles"
+                  placeholder={vehicles.length > 0 ? 'Immatriculation (liste fleet-hub)' : 'Immatriculation fleet-hub'}
+                  value={truckInput}
+                  onChange={(e) => setTruckInput(e.target.value)}
+                />
+                <datalist id="fleet-vehicles">
+                  {vehicles.map((v) => (
+                    <option key={v.registration} value={v.registration}>
+                      {v.capacityTons !== undefined ? `${v.capacityTons} t` : ''}
+                    </option>
+                  ))}
+                </datalist>
+                <button type="submit" className="btn btn-sm">{truckInput.trim() ? 'Affecter' : 'Retirer'}</button>
+              </form>
+            )}
+            <div style={{ marginTop: '12px' }}>
+              <LiveMap
+                height={260}
+                hubs={network.hubs
+                  .filter((h) => h._id === fromHub._id || h._id === toHub._id)
+                  .map((h) => ({ id: h._id, lat: h.lat, lng: h.lng, label: `${h.code} · ${h.name}` }))}
+                trucks={
+                  shipment.lastPosition && shipment.truckRegistration
+                    ? [{
+                        id: shipment._id,
+                        lat: shipment.lastPosition.lat,
+                        lng: shipment.lastPosition.lng,
+                        label: shipment.truckRegistration,
+                        stale: Date.now() - shipment.lastPosition.recordedAt > 30 * 60 * 1000,
+                      }]
+                    : []
+                }
+                trail={trail.map((p) => [p.lat, p.lng] as [number, number])}
+                plannedLine={(() => {
+                  const a = network.hubs.find((h) => h._id === fromHub._id)
+                  const b = network.hubs.find((h) => h._id === toHub._id)
+                  return a && b ? [[a.lat, a.lng], [b.lat, b.lng]] : undefined
+                })()}
+              />
+            </div>
+          </div>
+
           {canEdit && !isTerminal(shipment.status) && (
             <div className="card">
               <div className="card-title">
@@ -240,7 +318,7 @@ function ShipmentDetailPage() {
                     <div className="tl-line" />
                   </div>
                   <div className="tl-content">
-                    <div className="tl-event">{event.description}</div>
+                    <div className="tl-event">{event.description}{event.source && event.source !== 'manual' && <span className={`source-tag ${event.source}`}>{event.source === 'gps' ? 'GPS' : 'Auto'}</span>}</div>
                     <div className="tl-time">
                       {formatDateTime(event._creationTime)}
                       {event.location ? ` · ${event.location}` : ''}

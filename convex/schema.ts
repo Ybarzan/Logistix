@@ -9,6 +9,20 @@ export const roleSchema = v.union(
   v.literal("viewer"),
 );
 
+export const positionSchema = v.object({
+  lat: v.number(),
+  lng: v.number(),
+  speedKph: v.optional(v.number()),
+  // Horodatage de la mesure côté télématique (pas de la synchro).
+  recordedAt: v.number(),
+});
+
+export const eventSourceSchema = v.union(
+  v.literal("manual"),
+  v.literal("auto"),
+  v.literal("gps"),
+);
+
 export default defineSchema({
   // Tables requises par @convex-dev/auth. La table `users` est redéfinie
   // pour ajouter les champs métier (role, orgId) tout en conservant les
@@ -102,6 +116,10 @@ export default defineSchema({
     actualDelivery: v.optional(v.number()),
     createdAt: v.number(),
     updatedAt: v.optional(v.number()),
+    // Camion affecté (immatriculation fleet-hub) et dernière position GPS
+    // connue, alimentée automatiquement par la synchronisation fleet-hub.
+    truckRegistration: v.optional(v.string()),
+    lastPosition: v.optional(positionSchema),
     orgId: v.optional(v.id("organizations")),
   }).index("by_reference", ["reference"])
     .index("by_status", ["status"])
@@ -126,6 +144,8 @@ export default defineSchema({
     ),
     description: v.string(),
     location: v.optional(v.string()),
+    // Provenance : "manual" (saisi), "auto" (règle/cron), "gps" (télématique).
+    source: v.optional(eventSourceSchema),
     orgId: v.optional(v.id("organizations")),
   }).index("by_org_and_shipment", ["orgId", "shipmentId"])
     .index("by_org", ["orgId"]),
@@ -157,4 +177,36 @@ export default defineSchema({
     .index("by_org", ["orgId"])
     .index("by_org_and_status", ["orgId", "status"])
     .index("by_org_and_created_at", ["orgId", "createdAt"]),
+
+  // Connexion d'une organisation à fleet-hub (clé X-Marketplace-Key de la
+  // société transporteur). La clé n'est jamais renvoyée au navigateur.
+  fleethubIntegrations: defineTable({
+    orgId: v.id("organizations"),
+    baseUrl: v.string(),
+    apiKey: v.string(),
+    enabled: v.boolean(),
+    companyName: v.optional(v.string()),
+    complianceScore: v.optional(v.number()),
+    lastSyncAt: v.optional(v.number()),
+    lastError: v.optional(v.string()),
+  }).index("by_org", ["orgId"]),
+
+  // Camions disponibles côté fleet-hub, remplacés à chaque synchro.
+  vehicles: defineTable({
+    orgId: v.id("organizations"),
+    registration: v.string(),
+    capacityTons: v.optional(v.number()),
+    syncedAt: v.number(),
+  }).index("by_org", ["orgId"])
+    .index("by_org_and_registration", ["orgId", "registration"]),
+
+  // Historique GPS par expédition (trace sur la carte, base de l'ETA).
+  positionPings: defineTable({
+    orgId: v.id("organizations"),
+    shipmentId: v.id("shipments"),
+    lat: v.number(),
+    lng: v.number(),
+    speedKph: v.optional(v.number()),
+    recordedAt: v.number(),
+  }).index("by_shipment_and_time", ["shipmentId", "recordedAt"]),
 });

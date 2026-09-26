@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { getOrgScope, requireRole } from "./orgContext";
+import { eventSourceSchema } from "./schema";
 import type { MutationCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 
@@ -30,6 +31,7 @@ const eventFields = v.object({
   eventType: eventTypeSchema,
   description: v.string(),
   location: v.optional(v.string()),
+  source: v.optional(eventSourceSchema),
   orgId: v.optional(v.id("organizations")),
 });
 
@@ -45,6 +47,7 @@ export async function recordTrackingEvent(
     eventType: EventType;
     description: string;
     location?: string | undefined;
+    source?: "manual" | "auto" | "gps";
   },
 ): Promise<void> {
   await ctx.db.insert("trackingEvents", {
@@ -52,6 +55,7 @@ export async function recordTrackingEvent(
     eventType: data.eventType,
     description: data.description,
     orgId: data.orgId,
+    source: data.source ?? "manual",
     ...(data.location !== undefined ? { location: data.location } : {}),
   });
 }
@@ -90,6 +94,7 @@ export const log = mutation({
       eventType: args.eventType,
       description: args.description,
       orgId: scope.orgId,
+      source: "manual" as const,
       ...(args.location !== undefined ? { location: args.location } : {}),
     });
   },
@@ -105,6 +110,7 @@ export const recent = query({
       eventType: eventTypeSchema,
       description: v.string(),
       location: v.optional(v.string()),
+      source: v.optional(eventSourceSchema),
       reference: v.string(),
       fromCity: v.string(),
       toCity: v.string(),
@@ -152,6 +158,7 @@ export const recent = query({
       eventType: EventType;
       description: string;
       location?: string;
+      source?: "manual" | "auto" | "gps";
       reference: string;
       fromCity: string;
       toCity: string;
@@ -169,6 +176,7 @@ export const recent = query({
         fromCity: hubNames.get(shipment.fromHubId) ?? shipment.fromHubId,
         toCity: hubNames.get(shipment.toHubId) ?? shipment.toHubId,
         ...(event.location !== undefined ? { location: event.location } : {}),
+        ...(event.source !== undefined ? { source: event.source } : {}),
       });
     }
     return result;

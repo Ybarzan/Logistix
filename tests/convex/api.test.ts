@@ -177,3 +177,40 @@ describe("webhooks", () => {
     await expect(op.as.mutation(api.webhooks.create, { url: "https://x.fr", events: ["incident.opened"] })).rejects.toThrow(/Permissions/);
   });
 });
+
+describe("limite de débit de l'API", () => {
+  it("renvoie 429 + Retry-After au-delà du quota par minute, en-têtes X-RateLimit sinon", async () => {
+    vi.stubEnv("API_RATE_LIMIT_PER_MIN", "3");
+    const { t, apiKey } = await setup();
+    const statuses: Array<number> = [];
+    let last: Response | undefined;
+    for (let i = 0; i < 4; i++) {
+      last = await call(t, apiKey, "GET", "/api/v1/shipments");
+      statuses.push(last.status);
+    }
+    expect(statuses).toEqual([200, 200, 200, 429]);
+    expect(last?.headers.get("Retry-After")).toMatch(/^\d+$/);
+    expect(last?.headers.get("X-RateLimit-Limit")).toBe("3");
+    vi.unstubAllEnvs();
+  });
+
+  it("le quota se réinitialise à la minute suivante et est propre à chaque clé", async () => {
+    vi.useFakeTimers();
+    vi.stubEnv("API_RATE_LIMIT_PER_MIN", "1");
+    const { t, a, apiKey } = await setup();
+    const { apiKey: other } = await a.as.action(api.apiKeys.create, { name: "Autre clé" });
+    // Le décompte est appliqué en tâche de fond : on laisse passer les tâches
+    // planifiées entre deux requêtes (comme entre deux appels réels espacés).
+    const settle = async () => {
+      vi.advanceTimersByTime(1000);
+      await t.finishInProgressScheduledFunctions();
+    };
+    expect((await call(t, apiKey, "GET", "/api/v1/shipments")).status).toBe(200);
+    await settle();
+    expect((await call(t, apiKey, "GET", "/api/v1/shipments")).status).toBe(429);
+    expect((await call(t, other, "GET", "/api/v1/shipments")).status).toBe(200);
+    vi.advanceTimersByTime(61_000);
+    expect((await call(t, apiKey, "GET", "/api/v1/shipments")).status).toBe(200);
+    vi.unstubAllEnvs();
+  });
+});

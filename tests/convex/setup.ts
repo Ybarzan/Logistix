@@ -1,12 +1,15 @@
 /// <reference types="vite/client" />
 import { convexTest } from "convex-test";
+import rateLimiterTest from "@convex-dev/rate-limiter/test";
 import schema from "../../convex/schema";
 import type { Id } from "../../convex/_generated/dataModel";
 
 export const modules = import.meta.glob("../../convex/**/!(*.*.*)*.*s");
 
 export function newTest() {
-  return convexTest(schema, modules);
+  const t = convexTest(schema, modules);
+  rateLimiterTest.register(t);
+  return t;
 }
 
 export type T = ReturnType<typeof newTest>;

@@ -304,7 +304,6 @@ export default defineSchema({
     revokedAt: v.optional(v.number()),
   }).index("by_hash", ["keyHash"])
     .index("by_org", ["orgId"]),
-
   // Abonnements webhooks sortants (signés HMAC-SHA256).
   webhooks: defineTable({
     orgId: v.id("organizations"),

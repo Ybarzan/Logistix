@@ -45,21 +45,46 @@ function businessMessage(err: unknown): string {
   return (m ? m[1] : raw).slice(0, 300);
 }
 
-async function authenticate(ctx: ActionCtx, req: Request): Promise<Id<"organizations"> | null> {
+type AuthResult = { orgId: Id<"organizations">; limited: boolean; limit: number; retryAfterMs?: number };
+
+async function authenticate(ctx: ActionCtx, req: Request): Promise<AuthResult | null> {
   const header = req.headers.get("Authorization");
   const key = header?.startsWith("Bearer ") ? header.slice(7).trim() : req.headers.get("X-Api-Key")?.trim();
   if (!key || !key.startsWith("lx_live_")) return null;
   return await ctx.runMutation(internal.apiKeys.authenticate, { keyHash: await hashKey(key) });
 }
 
+/** Saturation passagère (conflits d'écriture après relances) : 503 + Retry-After, jamais 500. */
+function busy(): Response {
+  const res = problem(503, "busy", "Service momentanément saturé, réessayez");
+  res.headers.set("Retry-After", "1");
+  return res;
+}
+
+function withRateHeaders(res: Response, quota: AuthResult): Response {
+  const headers = new Headers(res.headers);
+  headers.set("X-RateLimit-Limit", String(quota.limit));
+  return new Response(res.body, { status: res.status, headers });
+}
+
 function withApiKey(handler: (ctx: ActionCtx, req: Request, orgId: Id<"organizations">) => Promise<Response>) {
   return httpAction(async (ctx, req) => {
-    const orgId = await authenticate(ctx, req);
-    if (!orgId) return problem(401, "unauthorized", "Clé d'API manquante, invalide ou révoquée");
+    let quota: AuthResult | null;
     try {
-      return await handler(ctx, req, orgId);
+      quota = await authenticate(ctx, req);
+    } catch {
+      return busy();
+    }
+    if (!quota) return problem(401, "unauthorized", "Clé d'API manquante, invalide ou révoquée");
+    if (quota.limited) {
+      const res = withRateHeaders(problem(429, "rate_limited", `Limite de ${quota.limit} requêtes par minute atteinte`), quota);
+      res.headers.set("Retry-After", String(Math.max(1, Math.ceil((quota.retryAfterMs ?? 60_000) / 1000))));
+      return res;
+    }
+    try {
+      return withRateHeaders(await handler(ctx, req, quota.orgId), quota);
     } catch (err) {
-      return problem(422, "unprocessable", businessMessage(err));
+      return withRateHeaders(problem(422, "unprocessable", businessMessage(err)), quota);
     }
   });
 }

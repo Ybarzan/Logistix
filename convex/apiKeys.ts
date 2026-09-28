@@ -1,8 +1,8 @@
 import { v } from "convex/values";
+import { MINUTE, RateLimiter } from "@convex-dev/rate-limiter";
 import { action, internalMutation, internalQuery, mutation, query } from "./_generated/server";
-import { internal } from "./_generated/api";
+import { components, internal } from "./_generated/api";
 import { getOrgScope, requireRole } from "./orgContext";
-import type { Id } from "./_generated/dataModel";
 
 /**
  * Clés d'API d'organisation pour l'API REST v1 (voir http.ts). Format
@@ -109,18 +109,68 @@ export const revoke = mutation({
   },
 });
 
-/** Résout une clé (déjà hachée) en organisation ; null si inconnue ou révoquée. */
+const LAST_USED_THROTTLE_MS = 60_000;
+
+/** Requêtes autorisées par minute et par clé (surchargeable : API_RATE_LIMIT_PER_MIN). */
+export function rateLimitPerMinute(): number {
+  const n = Number(process.env.API_RATE_LIMIT_PER_MIN);
+  return Number.isFinite(n) && n > 0 ? Math.floor(n) : 120;
+}
+
+/**
+ * Composant officiel : fenêtre fixe d'une minute, compteurs FRAGMENTÉS pour
+ * qu'une rafale de requêtes simultanées ne se dispute pas un seul document
+ * (un compteur unique provoquait des conflits d'écriture → erreurs 500).
+ */
+const rateLimiter = new RateLimiter(components.rateLimiter);
+
+/**
+ * Résout une clé (déjà hachée) et décompte la requête. null = clé inconnue
+ * ou révoquée ; limited = quota de la minute épuisé (retryAfterMs fourni).
+ */
 export const authenticate = internalMutation({
   args: { keyHash: v.string() },
-  returns: v.union(v.null(), v.id("organizations")),
-  handler: async (ctx, { keyHash }): Promise<Id<"organizations"> | null> => {
+  returns: v.union(
+    v.null(),
+    v.object({
+      orgId: v.id("organizations"),
+      limited: v.boolean(),
+      limit: v.number(),
+      retryAfterMs: v.optional(v.number()),
+    }),
+  ),
+  handler: async (ctx, { keyHash }) => {
     const key = await ctx.db.query("apiKeys").withIndex("by_hash", (q) => q.eq("keyHash", keyHash)).first();
     if (!key || key.revokedAt !== undefined) return null;
-    const now = Date.now();
-    // Écriture limitée à une par minute par clé (pas de conflit sous charge).
-    if (key.lastUsedAt === undefined || now - key.lastUsedAt > 60_000) {
-      await ctx.db.patch("apiKeys", key._id, { lastUsedAt: now });
+    const limit = rateLimitPerMinute();
+    const status = await rateLimiter.limit(ctx, "apiRequests", {
+      key: key._id,
+      // Décompte appliqué en tâche de fond (lot) : la requête ne fait que LIRE le
+      // compteur, donc une rafale de la même clé ne provoque plus de conflits
+      // d'écriture. Contrepartie assumée : léger dépassement possible au pic.
+      config: { kind: "fixed window", rate: limit, period: MINUTE, applyUpdates: "asynchronously" },
+    });
+    if (!status.ok) {
+      return { orgId: key.orgId, limited: true, limit, retryAfterMs: status.retryAfter };
     }
-    return key.orgId;
+    const now = Date.now();
+    // « Dernier usage » (une fois par minute au plus) écrit par une tâche planifiée :
+    // écrire ici invaliderait toutes les requêtes concurrentes qui lisent la clé.
+    if (key.lastUsedAt === undefined || now - key.lastUsedAt > LAST_USED_THROTTLE_MS) {
+      await ctx.scheduler.runAfter(0, internal.apiKeys.touchLastUsed, { keyId: key._id, at: now });
+    }
+    return { orgId: key.orgId, limited: false, limit };
+  },
+});
+
+export const touchLastUsed = internalMutation({
+  args: { keyId: v.id("apiKeys"), at: v.number() },
+  returns: v.null(),
+  handler: async (ctx, { keyId, at }) => {
+    const key = await ctx.db.get("apiKeys", keyId);
+    if (key && (key.lastUsedAt === undefined || at > key.lastUsedAt)) {
+      await ctx.db.patch("apiKeys", keyId, { lastUsedAt: at });
+    }
+    return null;
   },
 });

@@ -29,6 +29,10 @@ Clés d'API et webhooks se créent dans **Paramètres** (admin). Base : `<VITE_C
 
 Erreurs : `{ "error": { "code", "message" } }` avec 400 / 401 / 404 / 422 (règle métier, message lisible).
 
+**Limite de débit** : 120 requêtes/minute par clé (variable Convex `API_RATE_LIMIT_PER_MIN`), en-tête `X-RateLimit-Limit` ; au-delà `429` + `Retry-After`. Le décompte est appliqué de façon asynchrone (composant `@convex-dev/rate-limiter`) pour qu'une rafale d'une même clé ne crée pas de conflits d'écriture : quelques requêtes peuvent dépasser au pic (mesuré : 26 acceptées pour une limite de 20 sur une rafale de 40). Saturation transitoire du backend → `503` + `Retry-After`, jamais `500`.
+
+> Débit local : sur Convex auto-hébergé dans Docker Desktop (Windows), chaque requête authentifiée écrit un peu (décompte, file du limiteur) et les validations disque sont lentes : ~1,5 req/s mesurées, contre ~130 req/s pour `/health`. C'est une limite de l'environnement local, pas du code.
+
 **Webhooks** : `shipment.created`, `shipment.status_changed`, `incident.opened` (dont les *retards prévus*), `incident.resolved`. Chaque envoi porte `X-LogistiX-Signature: t=<ms>,v1=<hex>` avec `v1 = HMAC-SHA256(secret, "<t>.<corps brut>")` — vérifier la signature et rejeter un `t` trop ancien. Relances à 1 min, 5 min, 30 min et 2 h, puis échec visible dans Paramètres.
 
 ## Stack

@@ -213,7 +213,7 @@ function HubsPage() {
           <div className="empty-state">Aucun hub configuré. Ajoutez votre premier hub pour démarrer.</div>
         </div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '14px' }}>
+        <div className="hub-grid">
           {hubs.map((hub) => (
             <HubCard
               key={hub._id}

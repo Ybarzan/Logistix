@@ -54,10 +54,11 @@ function Layout() {
             <div className="dot-live" />
             Live sync
           </div>
-          <div style={{ fontSize: '12px', fontFamily: "'DM Mono', monospace", color: '#3d4a5c' }}>
+          <div className="topbar-date" style={{ fontSize: '12px', fontFamily: "'DM Mono', monospace", color: '#3d4a5c' }}>
             {new Date().toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })}
           </div>
           <span
+            className="topbar-role"
             style={{
               fontSize: '10px',
               fontFamily: "'DM Mono', monospace",

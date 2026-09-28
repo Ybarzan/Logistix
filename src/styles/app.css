@@ -242,3 +242,35 @@ body { font-family: 'Syne', sans-serif; background: #080b10; color: #e8eaf0; min
 .checklist { list-style: none; padding: 0; margin: 0 0 10px; font-family: 'DM Mono', monospace; font-size: 12px; color: #6b7a99; line-height: 1.8; }
 .checklist li.ok { color: #00d4aa; }
 .prediction-detail { font-family: 'DM Mono', monospace; font-size: 10px; color: #6b7a99; line-height: 1.5; margin-top: 2px; max-width: 320px; margin-left: auto; }
+
+/* ── Responsive : tablette et mobile ─────────────────────────────────── */
+.hub-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+@media (max-width: 1100px) {
+  .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+  .hub-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 900px) {
+  .shell { grid-template-columns: 1fr; grid-template-rows: auto auto 1fr; }
+  .topbar { padding: 0 12px; }
+  .topbar-right { gap: 8px; }
+  .topbar-date, .topbar-org, .badge-live { display: none; }
+  /* Navigation : barre horizontale défilante, toujours visible. */
+  .sidebar { flex-direction: row; overflow-x: auto; padding: 8px; gap: 4px; border-right: none; border-bottom: 1px solid #1e2535; position: sticky; top: 0; z-index: 20; scrollbar-width: none; }
+  .sidebar::-webkit-scrollbar { display: none; }
+  .nav-section { display: none; }
+  .nav-item { white-space: nowrap; flex-shrink: 0; padding: 7px 10px; font-size: 12px; }
+  .main { padding: 16px; min-width: 0; }
+  .detail-grid, .grid-3, .hub-grid { grid-template-columns: 1fr; }
+  .page-header { display: block !important; }
+  .page-title { font-size: 20px; }
+  /* Tableaux larges : défilement dans leur carte plutôt que toute la page. */
+  .main table { display: block; overflow-x: auto; max-width: 100%; }
+  .shipment-row { flex-wrap: wrap; }
+  .feed-item { flex-wrap: wrap; }
+  .feed-item > div:last-child { flex-direction: row !important; width: 100%; justify-content: flex-end; }
+}
+@media (max-width: 480px) {
+  .kpi-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .kpi-value { font-size: 24px; }
+  .topbar-role { display: none; }
+}

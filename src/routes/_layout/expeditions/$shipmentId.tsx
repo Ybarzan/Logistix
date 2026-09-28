@@ -16,7 +16,7 @@ import {
 } from '../../../components/shipmentMeta'
 import { can } from '../../../components/rbac'
 import { LiveMap } from '../../../components/LiveMap'
-import { ClientLinkPanel, Co2Row, CustomsPanel, FleetMarketPanel } from '../../../components/ShipmentPanels'
+import { ClientLinkPanel, Co2Row, CustomsPanel, FleetMarketPanel, PredictionRow } from '../../../components/ShipmentPanels'
 import { SHIPMENT_TRANSITIONS, isTerminal } from '../../../../convex/shipmentStatus'
 import type { ShipmentStatus } from '../../../../convex/shipmentStatus'
 import type { Id } from '../../../../convex/_generated/dataModel'
@@ -207,6 +207,7 @@ function ShipmentDetailPage() {
                 <span className="info-label">Livraison estimée</span>
                 <span className="info-value">{formatDate(shipment.estimatedDelivery)}</span>
               </div>
+              <PredictionRow shipment={shipment} />
               <div className="info-row">
                 <span className="info-label">Livraison réelle</span>
                 <span className="info-value">{formatDate(shipment.actualDelivery)}</span>

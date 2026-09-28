@@ -241,3 +241,4 @@ body { font-family: 'Syne', sans-serif; background: #080b10; color: #e8eaf0; min
 .rec-error { width: 100%; font-family: 'DM Mono', monospace; font-size: 11px; color: #ff8fa3; }
 .checklist { list-style: none; padding: 0; margin: 0 0 10px; font-family: 'DM Mono', monospace; font-size: 12px; color: #6b7a99; line-height: 1.8; }
 .checklist li.ok { color: #00d4aa; }
+.prediction-detail { font-family: 'DM Mono', monospace; font-size: 10px; color: #6b7a99; line-height: 1.5; margin-top: 2px; max-width: 320px; margin-left: auto; }

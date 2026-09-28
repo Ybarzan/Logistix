@@ -106,7 +106,16 @@ export const detectDelaysForOrg = internalMutation({
         if (existing) {
           // On n'escalade que nos propres incidents : un incident saisi
           // par un humain garde la sévérité qu'il lui a donnée.
-          if (
+          if (existing.source === "auto" && existing.predicted === true) {
+            // Le retard annoncé s'est réalisé : l'incident prédit devient un retard avéré.
+            await ctx.db.patch("incidents", existing._id, {
+              title: "Retard confirmé",
+              predicted: false,
+              description,
+              ...(SEVERITY_RANK[severity] > SEVERITY_RANK[existing.severity] ? { severity } : {}),
+            });
+            escalated += 1;
+          } else if (
             existing.source === "auto" &&
             SEVERITY_RANK[severity] > SEVERITY_RANK[existing.severity]
           ) {
@@ -214,6 +223,7 @@ export const runAutomation = internalAction({
       {},
     );
     for (const orgId of orgIds) {
+      await ctx.runMutation(internal.eta.predictForOrg, { orgId, now });
       await ctx.runMutation(internal.automation.detectDelaysForOrg, { orgId, now });
       await ctx.runMutation(internal.automation.detectHubOverloadForOrg, { orgId, now });
       await ctx.runMutation(internal.praxio.detectCustomsRiskForOrg, { orgId, now });

@@ -1,9 +1,10 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import { internal } from "./_generated/api";
 import { getOrgScope, requireOwned, requireRole } from "./orgContext";
 import { recordTrackingEvent } from "./tracking";
 import { canTransition, formatShipmentReference, isTerminal } from "./shipmentStatus";
-import { customsSchema, fleetmarketLinkSchema, positionSchema } from "./schema";
+import { customsSchema, fleetmarketLinkSchema, positionSchema, predictionSchema } from "./schema";
 import type { ShipmentStatus } from "./shipmentStatus";
 import type { MutationCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
@@ -47,6 +48,7 @@ const shipmentFields = v.object({
   goodsDescription: v.optional(v.string()),
   declaredValueEur: v.optional(v.number()),
   customs: v.optional(customsSchema),
+  prediction: v.optional(predictionSchema),
   orgId: v.optional(v.id("organizations")),
 });
 
@@ -82,6 +84,7 @@ const emptyStats = {
   inTransit: 0,
   onTimeRate: null,
   activeDelays: 0,
+  predictedDelays: 0,
   openIncidents: 0,
   recentShipments: [],
   activeAlerts: [],
@@ -100,6 +103,8 @@ export const dashboardStats = query({
     // null = aucune livraison mesurable sur 7 jours (et non 0 %).
     onTimeRate: v.union(v.number(), v.null()),
     activeDelays: v.number(),
+    // Retards annoncés par l'ETA prédictive, engagement pas encore dépassé.
+    predictedDelays: v.number(),
     openIncidents: v.number(),
     recentShipments: v.array(v.object({
       _id: v.id("shipments"),
@@ -189,6 +194,7 @@ export const dashboardStats = query({
       inTransit: inTransitDocs.length,
       onTimeRate,
       activeDelays: delayedDocs.length,
+      predictedDelays: openIncidents.filter((i) => i.predicted === true).length,
       openIncidents: openIncidents.length,
       recentShipments: recentShipmentsData.map((s) => ({
         _id: s._id,
@@ -362,6 +368,8 @@ export async function applyStatusChange(
     description: opts.description ?? statusDescriptions[status],
     source: opts.source ?? "manual",
   });
+  // L'ETA prédictive dépend du statut (départ, arrivée) : recalcul immédiat.
+  await ctx.scheduler.runAfter(0, internal.eta.refreshOne, { shipmentId: shipment._id });
 
   if (isTerminal(status)) {
     for (const incidentStatus of ["open", "investigating"] as const) {

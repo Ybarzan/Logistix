@@ -39,6 +39,8 @@ export const openActions = query({
       shipmentId: v.optional(v.id("shipments")),
       shipmentRef: v.optional(v.string()),
       hubId: v.optional(v.id("hubs")),
+      // Retard encore évitable : l'engagement n'est pas dépassé.
+      predicted: v.boolean(),
       actions: v.array(v.object({ kind: actionKind, label: v.string(), reason: v.string() })),
     }),
   ),
@@ -132,9 +134,14 @@ export const openActions = query({
         title: inc.title,
         description: inc.description,
         actions,
+        predicted: inc.predicted === true,
         ...(shipment ? { shipmentId: shipment._id, shipmentRef: shipment.reference } : {}),
         ...(inc.hubId ? { hubId: inc.hubId } : {}),
-        _rank: SEVERITY_RANK[inc.severity] * 10 + (shipment ? PRIORITY_RANK[shipment.priority] : 0),
+        // Un retard PRÉVU passe devant : c'est le seul qu'on peut encore éviter.
+        _rank:
+          (inc.predicted === true ? 100 : 0) +
+          SEVERITY_RANK[inc.severity] * 10 +
+          (shipment ? PRIORITY_RANK[shipment.priority] : 0),
         _createdAt: inc.createdAt,
       });
     }

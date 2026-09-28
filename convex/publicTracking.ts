@@ -58,6 +58,7 @@ export const get = query({
       toCity: v.string(),
       estimatedDelivery: v.optional(v.number()),
       actualDelivery: v.optional(v.number()),
+      predictedArrival: v.optional(v.object({ eta: v.number(), low: v.number(), high: v.number() })),
       approxPosition: v.optional(v.object({ lat: v.number(), lng: v.number(), recordedAt: v.number() })),
       events: v.array(v.object({ at: v.number(), description: v.string(), eventType: v.string() })),
     }),
@@ -89,6 +90,9 @@ export const get = query({
       toCity: to?.city ?? "",
       ...(shipment.estimatedDelivery !== undefined ? { estimatedDelivery: shipment.estimatedDelivery } : {}),
       ...(shipment.actualDelivery !== undefined ? { actualDelivery: shipment.actualDelivery } : {}),
+      ...(live && shipment.prediction
+        ? { predictedArrival: { eta: shipment.prediction.eta, low: shipment.prediction.low, high: shipment.prediction.high } }
+        : {}),
       ...(live && shipment.lastPosition
         ? {
             approxPosition: {

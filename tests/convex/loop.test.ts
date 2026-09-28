@@ -55,6 +55,24 @@ describe("actions recommandées", () => {
     expect(item.actions.map((x) => x.kind)).not.toContain("assign_truck");
   });
 
+  it("un retard prévu (encore évitable) passe devant un retard critique avéré", async () => {
+    const { t, a, id } = await setup("normal");
+    await t.run((ctx) =>
+      ctx.db.insert("incidents", {
+        orgId: a.orgId, type: "breakdown", severity: "critical", title: "Panne", description: "d",
+        status: "open", createdAt: Date.now(),
+      }),
+    );
+    await t.run((ctx) =>
+      ctx.db.insert("incidents", {
+        orgId: a.orgId, shipmentId: id, type: "delay", severity: "low", title: "Retard prévu", description: "d",
+        status: "open", source: "auto", predicted: true, createdAt: Date.now() - 5000,
+      }),
+    );
+    const items = await a.as.query(api.recommendations.openActions, {});
+    expect(items[0]).toMatchObject({ title: "Retard prévu", predicted: true });
+  });
+
   it("classe les incidents critiques en premier", async () => {
     const { t, a, id } = await setup("normal");
     await delayIncident(t, a.orgId, id, "low");

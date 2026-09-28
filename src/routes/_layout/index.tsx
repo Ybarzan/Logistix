@@ -65,7 +65,9 @@ function Dashboard() {
         <div className="kpi amber">
           <div className="kpi-label">Retards actifs</div>
           <div className="kpi-value">{stats.activeDelays}</div>
-          <div className="kpi-delta warn">à surveiller</div>
+          <div className="kpi-delta warn">
+            {stats.predictedDelays > 0 ? `+ ${stats.predictedDelays} prévu(s) par l'ETA` : 'à surveiller'}
+          </div>
         </div>
         <div className="kpi red">
           <div className="kpi-label">Incidents ouverts</div>
@@ -114,6 +116,7 @@ function Dashboard() {
                       <div className={`alert-dot ${tone}`} />
                       <div className="alert-text" style={{ flex: 1 }}>
                         <strong>{a.title}</strong>
+                        {a.predicted && <span className="source-tag auto">évitable</span>}
                         {a.shipmentRef ? <span className="mono"> · {a.shipmentRef}</span> : null} — {a.description}
                         <RecommendedActions item={a} canAct={canAct} />
                       </div>

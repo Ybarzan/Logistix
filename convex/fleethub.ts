@@ -9,6 +9,7 @@ import {
 import { internal } from "./_generated/api";
 import { getOrgScope, requireOwned, requireRole } from "./orgContext";
 import { recordTrackingEvent } from "./tracking";
+import { refreshPrediction } from "./eta";
 import type { Doc, Id } from "./_generated/dataModel";
 
 /**
@@ -331,6 +332,8 @@ export async function recordPosition(
       source: "gps",
     });
   }
+  // Chaque position recalcule l'ETA prédictive (et l'éventuel « retard prévu »).
+  await refreshPrediction(ctx, shipment._id, Math.max(Date.now(), p.recordedAt));
 }
 
 async function fetchJson(url: string, apiKey: string): Promise<{ status: number; body: unknown }> {

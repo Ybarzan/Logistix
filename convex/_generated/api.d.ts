@@ -13,6 +13,8 @@ import type * as automation from "../automation.js";
 import type * as co2 from "../co2.js";
 import type * as crons from "../crons.js";
 import type * as customsRules from "../customsRules.js";
+import type * as eta from "../eta.js";
+import type * as etaModel from "../etaModel.js";
 import type * as fleethub from "../fleethub.js";
 import type * as fleetmarket from "../fleetmarket.js";
 import type * as http from "../http.js";
@@ -43,6 +45,8 @@ declare const fullApi: ApiFromModules<{
   co2: typeof co2;
   crons: typeof crons;
   customsRules: typeof customsRules;
+  eta: typeof eta;
+  etaModel: typeof etaModel;
   fleethub: typeof fleethub;
   fleetmarket: typeof fleetmarket;
   http: typeof http;

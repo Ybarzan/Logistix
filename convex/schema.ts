@@ -40,6 +40,15 @@ export const customsSchema = v.object({
   error: v.optional(v.string()),
 });
 
+export const predictionSchema = v.object({
+  eta: v.number(),
+  low: v.number(),
+  high: v.number(),
+  method: v.union(v.literal("gps"), v.literal("route_history"), v.literal("route_plan")),
+  explanation: v.string(),
+  computedAt: v.number(),
+});
+
 export const eventSourceSchema = v.union(
   v.literal("manual"),
   v.literal("auto"),
@@ -153,6 +162,8 @@ export default defineSchema({
     goodsDescription: v.optional(v.string()),
     declaredValueEur: v.optional(v.number()),
     customs: v.optional(customsSchema),
+    // ETA prédictive (voir etaModel.ts), recalculée à chaque position GPS et par le cron.
+    prediction: v.optional(predictionSchema),
     orgId: v.optional(v.id("organizations")),
   }).index("by_reference", ["reference"])
     .index("by_tracking_token", ["trackingToken"])
@@ -204,6 +215,8 @@ export default defineSchema({
     // "auto" = créé par le cron de détection (peut être escaladé ou
     // clôturé automatiquement) ; absent/"manual" = saisi par un humain.
     source: v.optional(v.union(v.literal("auto"), v.literal("manual"))),
+    // true = retard PRÉDIT (l'engagement n'est pas encore dépassé).
+    predicted: v.optional(v.boolean()),
     orgId: v.optional(v.id("organizations")),
   }).index("by_status", ["status"])
     .index("by_severity", ["severity"])

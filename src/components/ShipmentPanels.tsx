@@ -347,3 +347,38 @@ export function CustomsPanel({ shipment, canEdit }: { shipment: Doc<'shipments'>
     </div>
   )
 }
+
+const METHOD_LABEL: Record<string, string> = {
+  gps: 'GPS en direct',
+  route_history: "historique de l'itinéraire",
+  route_plan: "durée prévue de l'itinéraire",
+}
+
+/** Arrivée prédite, fourchette, écart à l'engagement et explication. */
+export function PredictionRow({ shipment }: { shipment: Doc<'shipments'> }) {
+  const p = shipment.prediction
+  if (!p) return null
+  const committed = shipment.estimatedDelivery
+  const overrunMin = committed !== undefined ? Math.round((p.eta - committed) / 60000) : null
+  const late = overrunMin !== null && overrunMin >= 30
+  const time = (t: number) => new Date(t).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+  const day = (t: number) => new Date(t).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
+  return (
+    <div className="info-row" style={{ alignItems: 'flex-start' }}>
+      <span className="info-label">Arrivée prédite</span>
+      <span className="info-value" style={{ textAlign: 'right' }}>
+        <span style={{ color: late ? '#ef4444' : '#00d4aa' }}>
+          {day(p.eta)} {time(p.eta)}
+          {overrunMin !== null && Math.abs(overrunMin) >= 5 && (
+            <> ({overrunMin > 0 ? '+' : '−'}{Math.abs(overrunMin)} min vs engagement)</>
+          )}
+        </span>
+        <div className="prediction-detail">
+          entre {time(p.low)} et {time(p.high)} · {METHOD_LABEL[p.method]}
+          <br />
+          {p.explanation}
+        </div>
+      </span>
+    </div>
+  )
+}

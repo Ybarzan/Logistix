@@ -69,6 +69,17 @@ function PublicTrackingPage() {
               <span className="info-label">Livrée le</span>
               <span className="info-value">{formatDateTime(data.actualDelivery)}</span>
             </div>
+          ) : data.predictedArrival ? (
+            <div className="info-row">
+              <span className="info-label">Arrivée estimée (en direct)</span>
+              <span className="info-value">
+                {formatDateTime(data.predictedArrival.eta)}
+                <div className="prediction-detail">
+                  entre {new Date(data.predictedArrival.low).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })} et{' '}
+                  {new Date(data.predictedArrival.high).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                </div>
+              </span>
+            </div>
           ) : data.estimatedDelivery ? (
             <div className="info-row">
               <span className="info-label">Livraison prévue</span>

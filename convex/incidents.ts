@@ -22,6 +22,7 @@ const incidentFields = v.object({
   createdAt: v.number(),
   resolvedAt: v.optional(v.number()),
   source: v.optional(v.union(v.literal("auto"), v.literal("manual"))),
+  predicted: v.optional(v.boolean()),
   orgId: v.optional(v.id("organizations")),
 });
 

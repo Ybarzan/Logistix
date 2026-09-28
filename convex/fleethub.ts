@@ -10,6 +10,7 @@ import { internal } from "./_generated/api";
 import { getOrgScope, requireOwned, requireRole } from "./orgContext";
 import { recordTrackingEvent } from "./tracking";
 import { refreshPrediction } from "./eta";
+import { assertOutboundUrl } from "./urlPolicy";
 import type { Doc, Id } from "./_generated/dataModel";
 
 /**
@@ -29,12 +30,9 @@ const MIN_PING_INTERVAL_MS = 10 * 60 * 1000;
 
 const HTTP_TIMEOUT_MS = 8000;
 
+/** URL de base d'une intégration : http(s), sans identifiants, pas d'adresse interne (SSRF). */
 export function normalizeBaseUrl(raw: string): string {
-  const url = raw.trim().replace(/\/+$/, "");
-  if (!/^https?:\/\/[^\s]+$/.test(url)) {
-    throw new Error("URL fleet-hub invalide (http(s)://…)");
-  }
-  return url;
+  return assertOutboundUrl(raw);
 }
 
 /** Date locale fleet-hub (LocalDateTime sans fuseau) → epoch ms. */

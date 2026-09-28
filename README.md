@@ -54,6 +54,7 @@ Prérequis : Node ≥ 20, Docker Desktop.
 3. `npm install` puis `npm run dev`.
 4. Données de démo : `npx convex run seed:seed --typecheck=disable` (non idempotent). Pour rattacher un compte existant à l'organisation de démo : `npx convex run organizations:attachUserToOrg '{"email":"…","slug":"logistix","role":"admin"}'`.
 5. Intégrations : **Paramètres** → fleet-hub, FleetMarket, Praxio (URL + clé ; la clé ne quitte jamais le serveur). Depuis le conteneur Convex, les autres stacks locales sont joignables via `http://host.docker.internal:<port>`.
+   > **Protection SSRF** : les URL d'intégration et de webhook vers des adresses internes (loopback, réseaux privés, 169.254.x, `*.internal`…) sont refusées par défaut. En **local uniquement** : `npx convex env set ALLOW_PRIVATE_INTEGRATION_URLS true`. Ne jamais l'activer en production (et y filtrer aussi la sortie réseau, le contrôle ne couvre pas la résolution DNS).
 
 ## Scripts
 

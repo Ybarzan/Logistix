@@ -37,6 +37,7 @@ import type * as shipments from "../shipments.js";
 import type * as signup from "../signup.js";
 import type * as stats from "../stats.js";
 import type * as tracking from "../tracking.js";
+import type * as urlPolicy from "../urlPolicy.js";
 import type * as webhooks from "../webhooks.js";
 
 import type {
@@ -75,6 +76,7 @@ declare const fullApi: ApiFromModules<{
   signup: typeof signup;
   stats: typeof stats;
   tracking: typeof tracking;
+  urlPolicy: typeof urlPolicy;
   webhooks: typeof webhooks;
 }>;
 

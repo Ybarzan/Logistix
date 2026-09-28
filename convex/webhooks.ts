@@ -9,6 +9,7 @@ import {
 import { internal } from "./_generated/api";
 import { getOrgScope, requireRole } from "./orgContext";
 import { webhookEventType } from "./schema";
+import { assertOutboundUrl } from "./urlPolicy";
 import type { MutationCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 
@@ -209,6 +210,17 @@ export const deliver = internalAction({
   handler: async (ctx, { deliveryId }) => {
     const d = await ctx.runQuery(internal.webhooks.getDelivery, { deliveryId });
     if (!d || d.status !== "pending") return null;
+    // Revérifiée à l'envoi : la politique a pu se durcir depuis l'enregistrement.
+    try {
+      assertOutboundUrl(d.url);
+    } catch (err) {
+      await ctx.runMutation(internal.webhooks.recordAttempt, {
+        deliveryId,
+        ok: false,
+        error: err instanceof Error ? err.message : "URL refusée",
+      });
+      return null;
+    }
     if (!d.enabled) {
       await ctx.runMutation(internal.webhooks.recordAttempt, { deliveryId, ok: false, error: "Webhook désactivé" });
       return null;
@@ -252,15 +264,7 @@ export const deliver = internalAction({
 // ---------------------------------------------------------------------------
 
 function validateUrl(raw: string): string {
-  const url = raw.trim();
-  let parsed: URL;
-  try {
-    parsed = new URL(url);
-  } catch {
-    throw new Error("URL invalide");
-  }
-  if (parsed.protocol !== "https:" && parsed.protocol !== "http:") throw new Error("URL http(s) requise");
-  return url;
+  return assertOutboundUrl(raw);
 }
 
 export const list = query({

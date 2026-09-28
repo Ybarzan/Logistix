@@ -139,7 +139,7 @@ describe("sécurité de l'intégration", () => {
     const a = await orgWithUser(t, "admin");
     await expect(
       a.as.mutation(api.fleethub.saveConfig, { baseUrl: "file:///etc/passwd", apiKey: "x", enabled: false }),
-    ).rejects.toThrow(/URL fleet-hub invalide/);
+    ).rejects.toThrow(/URL http\(s\) requise/);
   });
 });
 

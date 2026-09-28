@@ -53,6 +53,14 @@ export const eventSourceSchema = v.union(
   v.literal("manual"),
   v.literal("auto"),
   v.literal("gps"),
+  v.literal("api"),
+);
+
+export const webhookEventType = v.union(
+  v.literal("shipment.created"),
+  v.literal("shipment.status_changed"),
+  v.literal("incident.opened"),
+  v.literal("incident.resolved"),
 );
 
 export default defineSchema({
@@ -277,4 +285,43 @@ export default defineSchema({
     lastCallAt: v.optional(v.number()),
     lastError: v.optional(v.string()),
   }).index("by_org", ["orgId"]),
+
+  // Clés d'API d'organisation (intégration ERP/WMS). Seul le SHA-256 est stocké.
+  apiKeys: defineTable({
+    orgId: v.id("organizations"),
+    name: v.string(),
+    keyHash: v.string(),
+    prefix: v.string(),
+    createdBy: v.id("users"),
+    createdAt: v.number(),
+    lastUsedAt: v.optional(v.number()),
+    revokedAt: v.optional(v.number()),
+  }).index("by_hash", ["keyHash"])
+    .index("by_org", ["orgId"]),
+
+  // Abonnements webhooks sortants (signés HMAC-SHA256).
+  webhooks: defineTable({
+    orgId: v.id("organizations"),
+    url: v.string(),
+    secret: v.string(),
+    events: v.array(webhookEventType),
+    enabled: v.boolean(),
+    createdAt: v.number(),
+  }).index("by_org", ["orgId"]),
+
+  // Journal de livraison (et file de relance) des webhooks.
+  webhookDeliveries: defineTable({
+    orgId: v.id("organizations"),
+    webhookId: v.id("webhooks"),
+    eventId: v.string(),
+    type: webhookEventType,
+    payload: v.string(),
+    attempts: v.number(),
+    status: v.union(v.literal("pending"), v.literal("delivered"), v.literal("failed")),
+    lastStatusCode: v.optional(v.number()),
+    lastError: v.optional(v.string()),
+    createdAt: v.number(),
+    deliveredAt: v.optional(v.number()),
+  }).index("by_webhook", ["webhookId"])
+    .index("by_org", ["orgId"]),
 });

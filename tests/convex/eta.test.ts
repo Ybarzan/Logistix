@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { api, internal } from "../../convex/_generated/api";
 import { haversineKm, predictEta, regulatoryStopsMs } from "../../convex/etaModel";
 import { newTest, orgWithUser } from "./setup";
@@ -143,5 +143,40 @@ describe("retard prévu (incident prédictif)", () => {
     const list = await incidents(t, a.orgId);
     expect(list).toHaveLength(1);
     expect(list[0]).toMatchObject({ title: "Retard confirmé", predicted: false, status: "open" });
+  });
+});
+
+describe("historique d'itinéraire", () => {
+  it("mesure la durée de roulage (départ → livraison), pas l'attente à quai", async () => {
+    vi.useFakeTimers();
+    // Horloge fixée AVANT toute écriture : _creationTime est monotone.
+    let clock = Date.UTC(2026, 8, 20, 6, 0);
+    vi.setSystemTime(clock);
+    const t = newTest();
+    const a = await orgWithUser(t, "admin");
+    const [lyon, mrs] = await t.run(async (ctx) => [
+      await ctx.db.insert("hubs", { orgId: a.orgId, name: "Lyon", code: "LYS", city: "Lyon", country: "France", capacity: 100, currentLoad: 0, ...LYON, isActive: true }),
+      await ctx.db.insert("hubs", { orgId: a.orgId, name: "Marseille", code: "MRS", city: "Marseille", country: "France", capacity: 100, currentLoad: 0, ...MARSEILLE, isActive: true }),
+    ]);
+    await t.run((ctx) => ctx.db.insert("routes", { orgId: a.orgId, name: "L→M", fromHubId: lyon, toHubId: mrs, distance: 315, avgDuration: 200, isActive: true }));
+    for (let i = 0; i < 3; i++) {
+      vi.setSystemTime(clock);
+      const id = await a.as.mutation(api.shipments.create, { fromHubId: lyon, toHubId: mrs, weight: 1, priority: "normal", customerName: `C${i}` });
+      clock += 20 * HOUR; // 20 h d'attente à quai : ne doit PAS compter
+      vi.setSystemTime(clock);
+      await a.as.mutation(api.shipments.updateStatus, { shipmentId: id, status: "in_transit" });
+      clock += 240 * MIN; // 4 h de route pour 3 h 20 prévues → ratio 1,2
+      vi.setSystemTime(clock);
+      await a.as.mutation(api.shipments.updateStatus, { shipmentId: id, status: "delivered" });
+      clock += HOUR;
+    }
+    vi.setSystemTime(clock);
+    const id = await a.as.mutation(api.shipments.create, { fromHubId: lyon, toHubId: mrs, weight: 1, priority: "normal", customerName: "X" });
+    await a.as.mutation(api.shipments.updateStatus, { shipmentId: id, status: "in_transit" });
+    await t.mutation(internal.eta.predictForOrg, { orgId: a.orgId, now: clock });
+    const s = await t.run((ctx) => ctx.db.get("shipments", id));
+    expect(s?.prediction?.method).toBe("route_history");
+    expect(s?.prediction?.explanation).toMatch(/× 1\.20 \(médiane des 3 dernières livraisons/);
+    vi.useRealTimers();
   });
 });

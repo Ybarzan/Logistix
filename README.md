@@ -16,6 +16,21 @@ La boucle : un retard est détecté → LogistiX propose **« trouver un transpo
 
 Chaque événement porte sa **provenance** (`manual` / `auto` / `gps`) : un fait télématique se distingue d'une saisie.
 
+## API REST v1 et webhooks (intégration ERP / WMS)
+
+Clés d'API et webhooks se créent dans **Paramètres** (admin). Base : `<VITE_CONVEX_SITE_URL>/api/v1`, en-tête `Authorization: Bearer lx_live_…`. Une clé n'agit que sur son organisation, avec des droits d'opérateur.
+
+| Méthode | Chemin | Rôle |
+|---|---|---|
+| `POST` | `/shipments` | Créer (hubs désignés par code ; idempotent sur `customerRef` + `customerName`) |
+| `GET` | `/shipments?status=&limit=` | Lister |
+| `GET` | `/shipments/{référence}` | Statut, ETA prédite (fourchette + explication), position, événements |
+| `POST` | `/shipments/{référence}/status` | Changer le statut (`{ "status", "note" }`), machine à états appliquée |
+
+Erreurs : `{ "error": { "code", "message" } }` avec 400 / 401 / 404 / 422 (règle métier, message lisible).
+
+**Webhooks** : `shipment.created`, `shipment.status_changed`, `incident.opened` (dont les *retards prévus*), `incident.resolved`. Chaque envoi porte `X-LogistiX-Signature: t=<ms>,v1=<hex>` avec `v1 = HMAC-SHA256(secret, "<t>.<corps brut>")` — vérifier la signature et rejeter un `t` trop ancien. Relances à 1 min, 5 min, 30 min et 2 h, puis échec visible dans Paramètres.
+
 ## Stack
 
 - **Backend** — [Convex](https://convex.dev) auto-hébergé : base, requêtes/mutations/actions, auth par mot de passe (`@convex-dev/auth`), crons.
@@ -64,6 +79,8 @@ La CI GitHub Actions exécute lint, tests et build à chaque push.
 - `praxio.ts` + `customsRules.ts` — régime douanier, classification SH, confirmation, incident préventif.
 - `recommendations.ts` — « que faire maintenant » : actions explicables par incident.
 - `publicTracking.ts` — lien de suivi client (`/suivi/<jeton>`), données réduites, révocable.
+- `eta.ts` + `etaModel.ts` — ETA prédictive (GPS, historique de roulage, règles CE 561/2006) et incident « retard prévu ».
+- `apiKeys.ts`, `publicApi.ts`, `http.ts` — API REST v1 ; `webhooks.ts` — événements sortants signés (toute ouverture/résolution d'incident passe par `openIncident`/`resolveIncident`).
 - `co2.ts` — CO₂e par expédition (t·km × facteur ; facteur par défaut indicatif, réglable par organisation).
 - `stats.ts` — SLA et performance sur une fenêtre indexée de 90 jours.
 

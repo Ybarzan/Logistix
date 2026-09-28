@@ -47,7 +47,7 @@ export async function recordTrackingEvent(
     eventType: EventType;
     description: string;
     location?: string | undefined;
-    source?: "manual" | "auto" | "gps";
+    source?: "manual" | "auto" | "gps" | "api";
   },
 ): Promise<void> {
   await ctx.db.insert("trackingEvents", {
@@ -158,7 +158,7 @@ export const recent = query({
       eventType: EventType;
       description: string;
       location?: string;
-      source?: "manual" | "auto" | "gps";
+      source?: "manual" | "auto" | "gps" | "api";
       reference: string;
       fromCity: string;
       toCity: string;

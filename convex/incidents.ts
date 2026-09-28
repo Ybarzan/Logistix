@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { getOrgScope, requireOwned, requireRole } from "./orgContext";
+import { openIncident, resolveIncident } from "./webhooks";
 
 const incidentFields = v.object({
   _id: v.id("incidents"),
@@ -82,7 +83,7 @@ export const create = mutation({
       await requireOwned(ctx, "hubs", args.hubId, scope.orgId);
     }
     if (!args.title.trim()) throw new Error("Titre requis");
-    return await ctx.db.insert("incidents", {
+    return await openIncident(ctx, {
       orgId: scope.orgId,
       source: "manual" as const,
       type: args.type,
@@ -105,10 +106,7 @@ export const resolve = mutation({
     const incident = await ctx.db.get("incidents", args.incidentId);
     if (!incident) throw new Error("Incident introuvable");
     if (incident.orgId !== scope.orgId) throw new Error("Accès refusé");
-    await ctx.db.patch("incidents", args.incidentId, {
-      status: "resolved" as const,
-      resolvedAt: Date.now(),
-    });
+    await resolveIncident(ctx, incident, Date.now());
     return null;
   },
 });
@@ -146,7 +144,13 @@ export const update = mutation({
       // Réouverture : on efface resolvedAt pour ne pas fausser les stats.
       patch.resolvedAt = args.status === "resolved" ? Date.now() : undefined;
     }
+    const resolving = args.status === "resolved" && incident.status !== "resolved";
+    if (resolving) delete patch.status;
     await ctx.db.patch("incidents", args.incidentId, patch);
+    if (resolving) {
+      const fresh = await ctx.db.get("incidents", args.incidentId);
+      if (fresh) await resolveIncident(ctx, fresh, Date.now());
+    }
     return null;
   },
 });

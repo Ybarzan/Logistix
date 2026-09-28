@@ -7,6 +7,7 @@ import { api } from '../../../convex/_generated/api'
 import { Field, Select, TextInput } from '../../components/form'
 import { can, roleLabel } from '../../components/rbac'
 import { formatDateTime } from '../../components/shipmentMeta'
+import { ApiKeysCard, WebhooksCard } from '../../components/IntegrationCards'
 import type { Role } from '../../components/rbac'
 import type { Id } from '../../../convex/_generated/dataModel'
 import type { FormEvent } from 'react'
@@ -184,6 +185,8 @@ function SettingsPage() {
       <FleetMarketCard isAdmin={isAdmin} />
       <PraxioCard isAdmin={isAdmin} />
       <Co2Card isAdmin={isAdmin} />
+      {isAdmin && <ApiKeysCard />}
+      {isAdmin && <WebhooksCard />}
 
       {isAdmin && invitations.length > 0 && (
         <div className="card" style={{ marginTop: '14px' }}>

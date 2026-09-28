@@ -5,6 +5,7 @@ import { getOrgScope, requireOwned, requireRole } from "./orgContext";
 import { recordTrackingEvent } from "./tracking";
 import { canTransition, formatShipmentReference, isTerminal } from "./shipmentStatus";
 import { customsSchema, fleetmarketLinkSchema, positionSchema, predictionSchema } from "./schema";
+import { emitEvent, resolveIncident, shipmentPayload } from "./webhooks";
 import type { ShipmentStatus } from "./shipmentStatus";
 import type { MutationCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
@@ -268,6 +269,76 @@ async function nextReference(ctx: MutationCtx, orgId: Id<"organizations">): Prom
   return reference;
 }
 
+export type CreateShipmentInput = {
+  fromHubId: Id<"hubs">;
+  toHubId: Id<"hubs">;
+  weight: number;
+  priority: "low" | "normal" | "high" | "urgent";
+  customerName: string;
+  customerRef?: string;
+  estimatedDelivery?: number;
+  goodsDescription?: string;
+  declaredValueEur?: number;
+};
+
+/**
+ * Création d'une expédition, partagée par l'UI et l'API REST : mêmes
+ * validations, même contrôle de propriété des hubs, même itinéraire/ETA
+ * par défaut, même référence et même événement webhook.
+ */
+export async function createShipmentCore(
+  ctx: MutationCtx,
+  orgId: Id<"organizations">,
+  args: CreateShipmentInput,
+  source: "manual" | "api" = "manual",
+): Promise<Id<"shipments">> {
+  if (args.fromHubId === args.toHubId) {
+    throw new Error("Les hubs de départ et d'arrivée doivent être différents");
+  }
+  validateWeight(args.weight);
+  const customerName = args.customerName.trim();
+  if (!customerName) throw new Error("Nom du client requis");
+  await requireOwned(ctx, "hubs", args.fromHubId, orgId);
+  await requireOwned(ctx, "hubs", args.toHubId, orgId);
+
+  const now = Date.now();
+  const route = await resolveRoute(ctx, orgId, args.fromHubId, args.toHubId);
+  // ETA par défaut : durée moyenne de l'itinéraire (minutes) si connue.
+  const estimatedDelivery =
+    args.estimatedDelivery ?? (route ? now + route.avgDuration * 60_000 : undefined);
+  const reference = await nextReference(ctx, orgId);
+
+  const shipmentId = await ctx.db.insert("shipments", {
+    reference,
+    fromHubId: args.fromHubId,
+    toHubId: args.toHubId,
+    status: "pending" as const,
+    weight: args.weight,
+    priority: args.priority,
+    customerName,
+    createdAt: now,
+    updatedAt: now,
+    orgId,
+    ...(route ? { routeId: route._id } : {}),
+    ...(args.customerRef ? { customerRef: args.customerRef } : {}),
+    ...(estimatedDelivery !== undefined ? { estimatedDelivery } : {}),
+    ...(args.goodsDescription?.trim() ? { goodsDescription: args.goodsDescription.trim() } : {}),
+    ...(args.declaredValueEur !== undefined && args.declaredValueEur > 0
+      ? { declaredValueEur: args.declaredValueEur }
+      : {}),
+  });
+  await recordTrackingEvent(ctx, {
+    orgId,
+    shipmentId,
+    eventType: "created",
+    description: source === "api" ? "Expédition créée par API" : "Expédition enregistrée, en attente de traitement",
+    source,
+  });
+  const created = await ctx.db.get("shipments", shipmentId);
+  if (created) await emitEvent(ctx, orgId, "shipment.created", shipmentPayload(created));
+  return shipmentId;
+}
+
 export const create = mutation({
   args: {
     fromHubId: v.id("hubs"),
@@ -283,48 +354,7 @@ export const create = mutation({
   returns: v.id("shipments"),
   handler: async (ctx, args) => {
     const scope = requireRole(await getOrgScope(ctx), "operator");
-    if (args.fromHubId === args.toHubId) {
-      throw new Error("Les hubs de départ et d'arrivée doivent être différents");
-    }
-    validateWeight(args.weight);
-    const customerName = args.customerName.trim();
-    if (!customerName) throw new Error("Nom du client requis");
-    await requireOwned(ctx, "hubs", args.fromHubId, scope.orgId);
-    await requireOwned(ctx, "hubs", args.toHubId, scope.orgId);
-
-    const now = Date.now();
-    const route = await resolveRoute(ctx, scope.orgId, args.fromHubId, args.toHubId);
-    // ETA par défaut : durée moyenne de l'itinéraire (minutes) si connue.
-    const estimatedDelivery =
-      args.estimatedDelivery ?? (route ? now + route.avgDuration * 60_000 : undefined);
-    const reference = await nextReference(ctx, scope.orgId);
-
-    const shipmentId = await ctx.db.insert("shipments", {
-      reference,
-      fromHubId: args.fromHubId,
-      toHubId: args.toHubId,
-      status: "pending" as const,
-      weight: args.weight,
-      priority: args.priority,
-      customerName,
-      createdAt: now,
-      updatedAt: now,
-      orgId: scope.orgId,
-      ...(route ? { routeId: route._id } : {}),
-      ...(args.customerRef !== undefined ? { customerRef: args.customerRef } : {}),
-      ...(estimatedDelivery !== undefined ? { estimatedDelivery } : {}),
-      ...(args.goodsDescription?.trim() ? { goodsDescription: args.goodsDescription.trim() } : {}),
-      ...(args.declaredValueEur !== undefined && args.declaredValueEur > 0
-        ? { declaredValueEur: args.declaredValueEur }
-        : {}),
-    });
-    await recordTrackingEvent(ctx, {
-      orgId: scope.orgId,
-      shipmentId,
-      eventType: "created",
-      description: "Expédition enregistrée, en attente de traitement",
-    });
-    return shipmentId;
+    return await createShipmentCore(ctx, scope.orgId, args);
   },
 });
 
@@ -346,7 +376,7 @@ export async function applyStatusChange(
   ctx: MutationCtx,
   shipment: Doc<"shipments">,
   status: ShipmentStatus,
-  opts: { description?: string; source?: "manual" | "auto" | "gps" } = {},
+  opts: { description?: string; source?: "manual" | "auto" | "gps" | "api" } = {},
 ): Promise<void> {
   if (!canTransition(shipment.status, status)) {
     throw new Error(`Transition interdite : ${shipment.status} → ${status}`);
@@ -368,6 +398,10 @@ export async function applyStatusChange(
     description: opts.description ?? statusDescriptions[status],
     source: opts.source ?? "manual",
   });
+  const updated = await ctx.db.get("shipments", shipment._id);
+  if (updated) {
+    await emitEvent(ctx, orgId, "shipment.status_changed", { ...shipmentPayload(updated), previousStatus: shipment.status });
+  }
   // L'ETA prédictive dépend du statut (départ, arrivée) : recalcul immédiat.
   await ctx.scheduler.runAfter(0, internal.eta.refreshOne, { shipmentId: shipment._id });
 
@@ -381,7 +415,7 @@ export async function applyStatusChange(
         .collect();
       for (const inc of incidents) {
         if (inc.shipmentId === shipment._id && inc.type === "delay" && inc.source === "auto") {
-          await ctx.db.patch("incidents", inc._id, { status: "resolved", resolvedAt: now });
+          await resolveIncident(ctx, inc, now);
         }
       }
     }

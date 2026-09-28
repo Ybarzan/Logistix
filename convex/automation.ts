@@ -7,6 +7,7 @@ import {
 import { internal } from "./_generated/api";
 import { applyStatusChange } from "./shipments";
 import { canTransition } from "./shipmentStatus";
+import { openIncident, resolveIncident } from "./webhooks";
 import type { MutationCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 
@@ -125,7 +126,7 @@ export const detectDelaysForOrg = internalMutation({
           continue;
         }
 
-        const incidentId = await ctx.db.insert("incidents", {
+        const incidentId = await openIncident(ctx, {
           orgId,
           shipmentId: shipment._id,
           type: "delay",
@@ -188,7 +189,7 @@ export const detectHubOverloadForOrg = internalMutation({
       const existing = capacityIncidentByHub.get(hub._id);
 
       if (overloaded && !existing) {
-        await ctx.db.insert("incidents", {
+        await openIncident(ctx, {
           orgId,
           hubId: hub._id,
           type: "capacity",
@@ -201,7 +202,7 @@ export const detectHubOverloadForOrg = internalMutation({
         });
         created += 1;
       } else if (!overloaded && existing?.source === "auto") {
-        await ctx.db.patch("incidents", existing._id, { status: "resolved", resolvedAt: now });
+        await resolveIncident(ctx, existing, now);
         resolved += 1;
       }
     }

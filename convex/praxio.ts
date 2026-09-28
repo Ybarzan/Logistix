@@ -12,6 +12,7 @@ import { getOrgScope, requireOwned, requireRole } from "./orgContext";
 import { recordTrackingEvent } from "./tracking";
 import { normalizeBaseUrl } from "./fleethub";
 import { REGIME_LABELS, customsRegime, isValidHsCode } from "./customsRules";
+import { openIncident, resolveIncident } from "./webhooks";
 import type { CustomsRegime } from "./customsRules";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
@@ -369,7 +370,7 @@ async function resolveCustomsIncidents(
       .collect();
     for (const inc of rows) {
       if (inc.shipmentId === shipmentId && inc.type === "customs" && inc.source === "auto") {
-        await ctx.db.patch("incidents", inc._id, { status: "resolved", resolvedAt: now });
+        await resolveIncident(ctx, inc, now);
       }
     }
   }
@@ -463,7 +464,7 @@ export const detectCustomsRiskForOrg = internalMutation({
           }
           continue;
         }
-        await ctx.db.insert("incidents", {
+        await openIncident(ctx, {
           orgId,
           shipmentId: s._id,
           type: "customs",

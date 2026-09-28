@@ -8,6 +8,7 @@
  * @module
  */
 
+import type * as apiKeys from "../apiKeys.js";
 import type * as auth from "../auth.js";
 import type * as automation from "../automation.js";
 import type * as co2 from "../co2.js";
@@ -23,6 +24,7 @@ import type * as incidents from "../incidents.js";
 import type * as orgContext from "../orgContext.js";
 import type * as organizations from "../organizations.js";
 import type * as praxio from "../praxio.js";
+import type * as publicApi from "../publicApi.js";
 import type * as publicTracking from "../publicTracking.js";
 import type * as recommendations from "../recommendations.js";
 import type * as routes from "../routes.js";
@@ -32,6 +34,7 @@ import type * as shipments from "../shipments.js";
 import type * as signup from "../signup.js";
 import type * as stats from "../stats.js";
 import type * as tracking from "../tracking.js";
+import type * as webhooks from "../webhooks.js";
 
 import type {
   ApiFromModules,
@@ -40,6 +43,7 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  apiKeys: typeof apiKeys;
   auth: typeof auth;
   automation: typeof automation;
   co2: typeof co2;
@@ -55,6 +59,7 @@ declare const fullApi: ApiFromModules<{
   orgContext: typeof orgContext;
   organizations: typeof organizations;
   praxio: typeof praxio;
+  publicApi: typeof publicApi;
   publicTracking: typeof publicTracking;
   recommendations: typeof recommendations;
   routes: typeof routes;
@@ -64,6 +69,7 @@ declare const fullApi: ApiFromModules<{
   signup: typeof signup;
   stats: typeof stats;
   tracking: typeof tracking;
+  webhooks: typeof webhooks;
 }>;
 
 /**

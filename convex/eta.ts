@@ -7,6 +7,7 @@ import {
   predictEta,
   predictedOverrunMs,
 } from "./etaModel";
+import { openIncident, resolveIncident } from "./webhooks";
 import type { MutationCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 
@@ -38,10 +39,17 @@ async function routeHistory(
     .withIndex("by_org_and_status", (q) => q.eq("orgId", orgId).eq("status", "delivered"))
     .order("desc")
     .take(300);
-  const ratios = delivered
-    .filter((s) => s.routeId === route._id && s.actualDelivery !== undefined && s.actualDelivery >= now - HISTORY_WINDOW_MS)
-    .map((s) => ((s.actualDelivery ?? 0) - s.createdAt) / (route.avgDuration * 60_000))
-    .filter((r) => r > 0.2 && r < 10);
+  const ratios: Array<number> = [];
+  for (const s of delivered) {
+    if (s.routeId !== route._id || s.actualDelivery === undefined || s.actualDelivery < now - HISTORY_WINDOW_MS) continue;
+    // Durée de ROULAGE (départ constaté → livraison), pas depuis la création :
+    // l'attente à quai n'a rien à voir avec la durée du trajet.
+    const departed = await departureTime(ctx, s);
+    if (departed === undefined || departed >= s.actualDelivery) continue;
+    const ratio = (s.actualDelivery - departed) / (route.avgDuration * 60_000);
+    // Écarte les valeurs aberrantes (saisie tardive du statut, test…).
+    if (ratio >= 0.5 && ratio <= 4) ratios.push(ratio);
+  }
   const ratio = median(ratios);
   return ratio === null ? undefined : { ratio, samples: ratios.length };
 }
@@ -110,7 +118,7 @@ export async function refreshPrediction(ctx: MutationCtx, shipmentId: Id<"shipme
     if (predictedIncident) {
       await ctx.db.patch("incidents", predictedIncident._id, { severity, description });
     } else if (open.length === 0) {
-      await ctx.db.insert("incidents", {
+      await openIncident(ctx, {
         orgId,
         shipmentId,
         type: "delay",
@@ -123,11 +131,10 @@ export async function refreshPrediction(ctx: MutationCtx, shipmentId: Id<"shipme
         createdAt: now,
       });
     }
-  } else if (predictedIncident && overrun <= 0) {
+  } else if (predictedIncident && overrun < PREDICTED_DELAY_THRESHOLD_MS / 2) {
+    // Hystérésis (ouverture à +30 min, fermeture sous +15 min) : pas d'alerte qui clignote.
     // Rattrapé : on referme, avec la raison, pour garder la trace.
-    await ctx.db.patch("incidents", predictedIncident._id, {
-      status: "resolved",
-      resolvedAt: now,
+    await resolveIncident(ctx, predictedIncident, now, {
       description: `${predictedIncident.description} → rattrapé (arrivée prédite ${clockFr(prediction.eta)})`,
     });
   }

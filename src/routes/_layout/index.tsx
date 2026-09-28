@@ -136,7 +136,7 @@ function Dashboard() {
                 {recentEvents.map((event, i) => (
                   <div key={event._id} className="tl-item">
                     <div className="tl-left">
-                      <div className="tl-dot" style={{ background: eventColors[event.eventType] || '#3d4a5c' }} />
+                      <div className="tl-dot" style={{ background: eventColors[event.eventType] || 'var(--faint)' }} />
                       {i < recentEvents.length - 1 && <div className="tl-line" />}
                     </div>
                     <div className="tl-content">
@@ -170,7 +170,7 @@ function Dashboard() {
                   <div className="bar-track">
                     <div className="bar-fill" style={{
                       width: `${h.load}%`,
-                      background: h.load > 85 ? '#f59e0b' : h.load > 70 ? '#3b82f6' : '#00d4aa'
+                      background: h.load > 85 ? 'var(--amber)' : h.load > 70 ? 'var(--blue)' : 'var(--accent)'
                     }} />
                   </div>
                   <div className="bar-val">{h.load}%</div>
@@ -201,19 +201,19 @@ function Dashboard() {
           <div className="card-title">SLA cette semaine</div>
           <div className="gauge-wrap">
             <svg className="gauge-svg" viewBox="0 0 120 70">
-              <path d="M15 65 A50 50 0 0 1 105 65" fill="none" stroke="#1a2135" strokeWidth="10" strokeLinecap="round"/>
-              <path d="M15 65 A50 50 0 0 1 105 65" fill="none" stroke="#00d4aa" strokeWidth="10" strokeLinecap="round" strokeDasharray="157" strokeDashoffset={157 * (1 - (stats.onTimeRate ?? 0) / 100)}/>
+              <path d="M15 65 A50 50 0 0 1 105 65" fill="none" stroke="var(--well)" strokeWidth="10" strokeLinecap="round"/>
+              <path d="M15 65 A50 50 0 0 1 105 65" fill="none" stroke="var(--accent)" strokeWidth="10" strokeLinecap="round" strokeDasharray="157" strokeDashoffset={157 * (1 - (stats.onTimeRate ?? 0) / 100)}/>
             </svg>
             <div className="gauge-pct">{stats.onTimeRate === null ? '—' : `${stats.onTimeRate}%`}</div>
             <div className="gauge-label">SLA respecté</div>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginTop: '12px', borderTop: '1px solid #1e2535', paddingTop: '14px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginTop: '12px', borderTop: '1px solid var(--line)', paddingTop: '14px' }}>
             <div className="mini-stat">
-              <div className="mini-num" style={{ fontSize: '18px', color: '#00d4aa' }}>{stats.onTime}</div>
+              <div className="mini-num" style={{ fontSize: '18px', color: 'var(--accent)' }}>{stats.onTime}</div>
               <div className="mini-label">Dans les délais</div>
             </div>
             <div className="mini-stat">
-              <div className="mini-num" style={{ fontSize: '18px', color: '#ef4444' }}>{stats.late}</div>
+              <div className="mini-num" style={{ fontSize: '18px', color: 'var(--red)' }}>{stats.late}</div>
               <div className="mini-label">Hors délai</div>
             </div>
           </div>

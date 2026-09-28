@@ -190,19 +190,19 @@ function IncidentsPage() {
           <div className="empty-state">Aucun incident ne correspond aux filtres.</div>
         ) : (
           filtered.map((incident) => {
-            const color = severityColors[incident.severity] || '#6b7a99'
+            const color = severityColors[incident.severity] || 'var(--muted)'
             return (
               <div key={incident._id} className="feed-item">
                 <div className="feed-dot" style={{ background: color }} />
                 <div className="feed-body">
                   <div className="feed-title">
-                    <strong style={{ color: '#c8d0e0', fontWeight: 500 }}>{incident.title}</strong>
+                    <strong style={{ color: 'var(--text-2)', fontWeight: 500 }}>{incident.title}</strong>
                     <span style={{
                       fontSize: '10px',
-                      fontFamily: "'DM Mono', monospace",
+                      fontFamily: 'var(--font)',
                       padding: '2px 8px',
                       borderRadius: '10px',
-                      background: `${color}18`,
+                      background: `color-mix(in srgb, ${color} 12%, transparent)`,
                       color,
                     }}>
                       {incident.severity.toUpperCase()}

@@ -24,7 +24,7 @@ export function CarrierScorecards() {
               <tr key={c.key}>
                 <td>{c.name}</td>
                 <td className="mono">{c.shipments}</td>
-                <td className="mono" style={{ color: c.onTimeRate === null ? undefined : c.onTimeRate >= 90 ? '#00d4aa' : c.onTimeRate >= 75 ? '#f59e0b' : '#ef4444' }}>
+                <td className="mono" style={{ color: c.onTimeRate === null ? undefined : c.onTimeRate >= 90 ? 'var(--accent)' : c.onTimeRate >= 75 ? 'var(--amber)' : 'var(--red)' }}>
                   {c.onTimeRate === null ? '—' : `${c.onTimeRate}% (${c.onTime}/${c.delivered})`}
                 </td>
                 <td className="mono">{c.avgDelayMin === null ? '—' : `${c.avgDelayMin} min`}</td>

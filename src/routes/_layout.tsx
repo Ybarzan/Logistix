@@ -5,6 +5,7 @@ import { convexQuery } from '@convex-dev/react-query'
 import { useEffect } from 'react'
 import { api } from '../../convex/_generated/api'
 import { roleLabel } from '../components/rbac'
+import { Ambient } from '../components/Ambient'
 
 export const Route = createFileRoute('/_layout')({
   component: Layout,
@@ -33,14 +34,19 @@ function Layout() {
 
   if (isLoading || !isAuthenticated) {
     return (
+      <>
+      <Ambient />
       <div className="loading-shell">
         <div className="dot-live" />
         Chargement de la session…
       </div>
+      </>
     )
   }
 
   return (
+    <>
+    <Ambient />
     <div className="shell">
       <div className="topbar">
         <div className="logo">
@@ -54,19 +60,19 @@ function Layout() {
             <div className="dot-live" />
             Live sync
           </div>
-          <div className="topbar-date" style={{ fontSize: '12px', fontFamily: "'DM Mono', monospace", color: '#3d4a5c' }}>
+          <div className="topbar-date" style={{ fontSize: '12px', fontFamily: 'var(--font)', color: 'var(--faint)' }}>
             {new Date().toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })}
           </div>
           <span
             className="topbar-role"
             style={{
               fontSize: '10px',
-              fontFamily: "'DM Mono', monospace",
+              fontFamily: 'var(--font)',
               padding: '3px 8px',
               borderRadius: '10px',
-              background: '#3b82f614',
-              color: '#3b82f6',
-              border: '1px solid #3b82f633',
+              background: 'rgba(91, 140, 255, 0.08)',
+              color: 'var(--blue)',
+              border: '1px solid rgba(91, 140, 255, 0.22)',
             }}
           >
             {roleLabel(currentUser?.role)}
@@ -158,5 +164,6 @@ function Layout() {
         <Outlet />
       </div>
     </div>
+    </>
   )
 }

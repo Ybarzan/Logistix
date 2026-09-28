@@ -1,6 +1,7 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useAuthActions, useConvexAuth } from '@convex-dev/auth/react'
 import { useEffect, useState } from 'react'
+import { Ambient } from '../components/Ambient'
 import type { FormEvent } from 'react'
 
 export const Route = createFileRoute('/login')({
@@ -56,6 +57,8 @@ function LoginPage() {
   }
 
   return (
+    <>
+    <Ambient />
     <div className="auth-shell">
       <div className="auth-panel">
         <div className="auth-logo">
@@ -63,7 +66,7 @@ function LoginPage() {
         </div>
         <div className="auth-sub">Plateforme de supervision logistique</div>
         {invite && (
-          <div className="auth-sub" style={{ color: '#00d4aa' }}>
+          <div className="auth-sub" style={{ color: 'var(--accent)' }}>
             Vous avez été invité à rejoindre une organisation : créez votre compte avec l'adresse e-mail invitée.
           </div>
         )}
@@ -150,7 +153,7 @@ function LoginPage() {
         <div className="auth-hint">
           {mode === 'signUp'
             ? 'Chaque inscription crée son organisation ; rejoignez une équipe via son lien d’invitation.'
-            : 'Le démo : créez un compte puis connectez-vous.'}
+            : 'Connectez-vous à votre poste de pilotage logistique.'}
         </div>
         <div className="auth-live">
           <div className="dot-live" />
@@ -158,5 +161,6 @@ function LoginPage() {
         </div>
       </div>
     </div>
+    </>
   )
 }

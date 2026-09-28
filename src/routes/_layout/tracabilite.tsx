@@ -55,24 +55,24 @@ function TracingPage() {
         ) : (
           filtered.map((event) => (
             <div key={event._id} className="feed-item">
-              <div className="feed-dot" style={{ background: eventColors[event.eventType] || '#3d4a5c' }} />
+              <div className="feed-dot" style={{ background: eventColors[event.eventType] || 'var(--faint)' }} />
               <div className="feed-body">
                 <div className="feed-title">
                   <Link
                     to="/expeditions/$shipmentId"
                     params={{ shipmentId: event.shipmentId }}
-                    style={{ color: '#3b82f6', fontFamily: "'DM Mono', monospace", fontSize: '12px' }}
+                    style={{ color: 'var(--blue)', fontFamily: 'var(--font)', fontSize: '12px' }}
                   >
                     {event.reference}
                   </Link>
                   <span
                     style={{
                       fontSize: '10px',
-                      fontFamily: "'DM Mono', monospace",
+                      fontFamily: 'var(--font)',
                       padding: '2px 8px',
                       borderRadius: '10px',
-                      background: `${eventColors[event.eventType] || '#3d4a5c'}18`,
-                      color: eventColors[event.eventType] || '#3d4a5c',
+                      background: `color-mix(in srgb, ${eventColors[event.eventType] || 'var(--faint)'} 12%, transparent)`,
+                      color: eventColors[event.eventType] || 'var(--faint)',
                     }}
                   >
                     {eventLabels[event.eventType]}

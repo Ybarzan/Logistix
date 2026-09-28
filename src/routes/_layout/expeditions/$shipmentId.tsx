@@ -13,6 +13,7 @@ import {
   priorityColors,
   statusClasses,
   statusLabels,
+  toDatetimeLocal,
 } from '../../../components/shipmentMeta'
 import { can } from '../../../components/rbac'
 import { LiveMap } from '../../../components/LiveMap'
@@ -89,7 +90,7 @@ function ShipmentDetailPage() {
       customerName: shipment.customerName,
       customerRef: shipment.customerRef ?? '',
       estimatedDelivery: shipment.estimatedDelivery
-        ? new Date(shipment.estimatedDelivery).toISOString().slice(0, 16)
+        ? toDatetimeLocal(shipment.estimatedDelivery)
         : '',
       goodsDescription: shipment.goodsDescription ?? '',
       declaredValueEur: shipment.declaredValueEur !== undefined ? String(shipment.declaredValueEur) : '',
@@ -138,7 +139,7 @@ function ShipmentDetailPage() {
     }
   }
 
-  const priorityColor = priorityColors[shipment.priority] || '#6b7a99'
+  const priorityColor = priorityColors[shipment.priority] || 'var(--muted)'
 
   return (
     <>
@@ -148,7 +149,7 @@ function ShipmentDetailPage() {
             <Link className="link" to="/expeditions">← Expéditions</Link>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div className="page-title" style={{ color: '#3b82f6', fontFamily: "'DM Mono', monospace", fontSize: '20px' }}>
+            <div className="page-title" style={{ color: 'var(--blue)', fontFamily: 'var(--font)', fontSize: '20px' }}>
               {shipment.reference}
             </div>
             <span className={`status-pill ${statusClasses[shipment.status] || 'transit'}`}>
@@ -156,10 +157,10 @@ function ShipmentDetailPage() {
             </span>
             <span style={{
               fontSize: '10px',
-              fontFamily: "'DM Mono', monospace",
+              fontFamily: 'var(--font)',
               padding: '3px 8px',
               borderRadius: '10px',
-              background: `${priorityColor}18`,
+              background: `color-mix(in srgb, ${priorityColor} 12%, transparent)`,
               color: priorityColor,
             }}>
               {shipment.priority.toUpperCase()}
@@ -325,7 +326,7 @@ function ShipmentDetailPage() {
               {events.map((event) => (
                 <div key={event._id} className="tl-item">
                   <div className="tl-left">
-                    <div className="tl-dot" style={{ background: eventColors[event.eventType] || '#3d4a5c', width: '9px', height: '9px' }} />
+                    <div className="tl-dot" style={{ background: eventColors[event.eventType] || 'var(--faint)', width: '9px', height: '9px' }} />
                     <div className="tl-line" />
                   </div>
                   <div className="tl-content">

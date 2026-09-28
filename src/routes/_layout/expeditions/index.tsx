@@ -199,17 +199,17 @@ function ShipmentsPage() {
         </Select>
       </div>
 
-      <div className="card" style={{ padding: 0 }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+      <div className="card" style={{ padding: 0, overflowX: 'auto' }}>
+        <table className="ship-table">
           <thead>
-            <tr style={{ borderBottom: '1px solid #1e2535' }}>
-              <th style={{ padding: '14px 16px', textAlign: 'left', fontSize: '10px', fontFamily: "'DM Mono', monospace", color: '#3d4a5c', letterSpacing: '1px', textTransform: 'uppercase' }}>Réf.</th>
-              <th style={{ padding: '14px 16px', textAlign: 'left', fontSize: '10px', fontFamily: "'DM Mono', monospace", color: '#3d4a5c', letterSpacing: '1px', textTransform: 'uppercase' }}>Trajet</th>
-              <th style={{ padding: '14px 16px', textAlign: 'left', fontSize: '10px', fontFamily: "'DM Mono', monospace", color: '#3d4a5c', letterSpacing: '1px', textTransform: 'uppercase' }}>Client</th>
-              <th style={{ padding: '14px 16px', textAlign: 'left', fontSize: '10px', fontFamily: "'DM Mono', monospace", color: '#3d4a5c', letterSpacing: '1px', textTransform: 'uppercase' }}>Créée</th>
-              <th style={{ padding: '14px 16px', textAlign: 'left', fontSize: '10px', fontFamily: "'DM Mono', monospace", color: '#3d4a5c', letterSpacing: '1px', textTransform: 'uppercase' }}>Poids</th>
-              <th style={{ padding: '14px 16px', textAlign: 'left', fontSize: '10px', fontFamily: "'DM Mono', monospace", color: '#3d4a5c', letterSpacing: '1px', textTransform: 'uppercase' }}>Priorité</th>
-              <th style={{ padding: '14px 16px', textAlign: 'left', fontSize: '10px', fontFamily: "'DM Mono', monospace", color: '#3d4a5c', letterSpacing: '1px', textTransform: 'uppercase' }}>Statut</th>
+            <tr>
+              <th>Réf.</th>
+              <th>Trajet</th>
+              <th>Client</th>
+              <th>Créée</th>
+              <th>Poids</th>
+              <th>Priorité</th>
+              <th>Statut</th>
             </tr>
           </thead>
           <tbody>
@@ -225,12 +225,9 @@ function ShipmentsPage() {
             {filteredShipments.map((s) => (
               <tr
                 key={s._id}
-                style={{ borderBottom: '1px solid #1a2135', cursor: 'pointer' }}
-                onMouseEnter={(e) => (e.currentTarget as HTMLElement).style.background = '#0a0c10'}
-                onMouseLeave={(e) => (e.currentTarget as HTMLElement).style.background = 'transparent'}
                 onClick={() => navigate({ to: '/expeditions/$shipmentId', params: { shipmentId: s._id } })}
               >
-                <td style={{ padding: '14px 16px', fontFamily: "'DM Mono', monospace", fontSize: '12px', color: '#3b82f6' }}>
+                <td style={{ padding: '14px 16px', fontFamily: 'var(--font)', fontSize: '12px', color: 'var(--blue)' }}>
                   <Link
                     to="/expeditions/$shipmentId"
                     params={{ shipmentId: s._id }}
@@ -239,25 +236,25 @@ function ShipmentsPage() {
                     {s.reference}
                   </Link>
                 </td>
-                <td style={{ padding: '14px 16px', fontSize: '13px', color: '#c8d0e0' }}>
+                <td style={{ padding: '14px 16px', fontSize: '13px', color: 'var(--text-2)' }}>
                   {hubName(s.fromHubId)} → {hubName(s.toHubId)}
                 </td>
-                <td style={{ padding: '14px 16px', fontSize: '13px', color: '#8090a8' }}>
+                <td style={{ padding: '14px 16px', fontSize: '13px', color: 'var(--muted)' }}>
                   {s.customerName}
-                  {s.customerRef ? <span style={{ color: '#3d4a5c' }}> · {s.customerRef}</span> : null}
+                  {s.customerRef ? <span style={{ color: 'var(--faint)' }}> · {s.customerRef}</span> : null}
                 </td>
-                <td style={{ padding: '14px 16px', fontFamily: "'DM Mono', monospace", fontSize: '11px', color: '#6b7a99' }}>
+                <td style={{ padding: '14px 16px', fontFamily: 'var(--font)', fontSize: '11px', color: 'var(--muted)' }}>
                   {formatDate(s.createdAt)}
                 </td>
-                <td style={{ padding: '14px 16px', fontFamily: "'DM Mono', monospace", fontSize: '12px', color: '#6b7a99' }}>{s.weight.toLocaleString()} kg</td>
+                <td style={{ padding: '14px 16px', fontFamily: 'var(--font)', fontSize: '12px', color: 'var(--muted)' }}>{s.weight.toLocaleString()} kg</td>
                 <td style={{ padding: '14px 16px' }}>
                   <span style={{
                     fontSize: '10px',
-                    fontFamily: "'DM Mono', monospace",
+                    fontFamily: 'var(--font)',
                     padding: '3px 8px',
                     borderRadius: '10px',
-                    background: `${priorityColors[s.priority] || '#6b7a99'}18`,
-                    color: priorityColors[s.priority] || '#6b7a99',
+                    background: `color-mix(in srgb, ${priorityColors[s.priority] || 'var(--muted)'} 12%, transparent)`,
+                    color: priorityColors[s.priority] || 'var(--muted)',
                   }}>
                     {s.priority.toUpperCase()}
                   </span>

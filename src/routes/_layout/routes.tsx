@@ -134,13 +134,13 @@ function RoutesPage() {
       <div className="card" style={{ padding: 0 }}>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
-            <tr style={{ borderBottom: '1px solid #1e2535' }}>
-              <th style={{ padding: '14px 16px', textAlign: 'left', fontSize: '10px', fontFamily: "'DM Mono', monospace", color: '#3d4a5c', letterSpacing: '1px', textTransform: 'uppercase' }}>Route</th>
-              <th style={{ padding: '14px 16px', textAlign: 'left', fontSize: '10px', fontFamily: "'DM Mono', monospace", color: '#3d4a5c', letterSpacing: '1px', textTransform: 'uppercase' }}>Origine</th>
-              <th style={{ padding: '14px 16px', textAlign: 'left', fontSize: '10px', fontFamily: "'DM Mono', monospace", color: '#3d4a5c', letterSpacing: '1px', textTransform: 'uppercase' }}>Destination</th>
-              <th style={{ padding: '14px 16px', textAlign: 'left', fontSize: '10px', fontFamily: "'DM Mono', monospace", color: '#3d4a5c', letterSpacing: '1px', textTransform: 'uppercase' }}>Distance</th>
-              <th style={{ padding: '14px 16px', textAlign: 'left', fontSize: '10px', fontFamily: "'DM Mono', monospace", color: '#3d4a5c', letterSpacing: '1px', textTransform: 'uppercase' }}>Durée moy.</th>
-              <th style={{ padding: '14px 16px', textAlign: 'left', fontSize: '10px', fontFamily: "'DM Mono', monospace", color: '#3d4a5c', letterSpacing: '1px', textTransform: 'uppercase' }}>Statut</th>
+            <tr style={{ borderBottom: '1px solid var(--line)' }}>
+              <th style={{ padding: '14px 16px', textAlign: 'left', fontSize: '10px', fontFamily: 'var(--font)', color: 'var(--faint)', letterSpacing: '1px', textTransform: 'uppercase' }}>Route</th>
+              <th style={{ padding: '14px 16px', textAlign: 'left', fontSize: '10px', fontFamily: 'var(--font)', color: 'var(--faint)', letterSpacing: '1px', textTransform: 'uppercase' }}>Origine</th>
+              <th style={{ padding: '14px 16px', textAlign: 'left', fontSize: '10px', fontFamily: 'var(--font)', color: 'var(--faint)', letterSpacing: '1px', textTransform: 'uppercase' }}>Destination</th>
+              <th style={{ padding: '14px 16px', textAlign: 'left', fontSize: '10px', fontFamily: 'var(--font)', color: 'var(--faint)', letterSpacing: '1px', textTransform: 'uppercase' }}>Distance</th>
+              <th style={{ padding: '14px 16px', textAlign: 'left', fontSize: '10px', fontFamily: 'var(--font)', color: 'var(--faint)', letterSpacing: '1px', textTransform: 'uppercase' }}>Durée moy.</th>
+              <th style={{ padding: '14px 16px', textAlign: 'left', fontSize: '10px', fontFamily: 'var(--font)', color: 'var(--faint)', letterSpacing: '1px', textTransform: 'uppercase' }}>Statut</th>
               {realRoutes && canManage ? <th style={{ width: '150px' }} /> : null}
             </tr>
           </thead>
@@ -153,30 +153,30 @@ function RoutesPage() {
               </tr>
             )}
             {display.map((route) => (
-              <tr key={route._id} style={{ borderBottom: '1px solid #1a2135' }}>
+              <tr key={route._id} style={{ borderBottom: '1px solid var(--well)' }}>
                 <td style={{ padding: '14px 16px' }}>
-                  <div style={{ fontSize: '13px', color: '#c8d0e0', fontWeight: 500 }}>{route.name}</div>
+                  <div style={{ fontSize: '13px', color: 'var(--text-2)', fontWeight: 500 }}>{route.name}</div>
                 </td>
-                <td style={{ padding: '14px 16px', fontFamily: "'DM Mono', monospace", fontSize: '12px', color: '#6b7a99' }}>
+                <td style={{ padding: '14px 16px', fontFamily: 'var(--font)', fontSize: '12px', color: 'var(--muted)' }}>
                   {getHubCity(route.fromHubId)}
                 </td>
-                <td style={{ padding: '14px 16px', fontFamily: "'DM Mono', monospace", fontSize: '12px', color: '#6b7a99' }}>
+                <td style={{ padding: '14px 16px', fontFamily: 'var(--font)', fontSize: '12px', color: 'var(--muted)' }}>
                   {getHubCity(route.toHubId)}
                 </td>
-                <td style={{ padding: '14px 16px', fontFamily: "'DM Mono', monospace", fontSize: '12px', color: '#3d4a5c' }}>
+                <td style={{ padding: '14px 16px', fontFamily: 'var(--font)', fontSize: '12px', color: 'var(--faint)' }}>
                   {route.distance.toLocaleString()} km
                 </td>
-                <td style={{ padding: '14px 16px', fontFamily: "'DM Mono', monospace", fontSize: '12px', color: '#3d4a5c' }}>
+                <td style={{ padding: '14px 16px', fontFamily: 'var(--font)', fontSize: '12px', color: 'var(--faint)' }}>
                   {formatDuration(route.avgDuration)}
                 </td>
                 <td style={{ padding: '14px 16px' }}>
                   <span style={{
                     fontSize: '10px',
-                    fontFamily: "'DM Mono', monospace",
+                    fontFamily: 'var(--font)',
                     padding: '3px 8px',
                     borderRadius: '10px',
-                    background: route.isActive ? '#00d4aa14' : '#ef444414',
-                    color: route.isActive ? '#00d4aa' : '#ef4444',
+                    background: route.isActive ? 'rgba(31, 224, 184, 0.08)' : 'rgba(255, 95, 109, 0.08)',
+                    color: route.isActive ? 'var(--accent)' : 'var(--red)',
                   }}>
                     {route.isActive ? 'Active' : 'Inactive'}
                   </span>
@@ -216,8 +216,8 @@ function RoutesPage() {
                     <div className="route-to">{r.name.split(' → ')[1] ?? ''}</div>
                   </div>
                   <div style={{ margin: '6px 0 0' }}>
-                    <div style={{ height: '4px', background: '#1a2135', borderRadius: '2px', overflow: 'hidden' }}>
-                      <div style={{ width: `${100 - i * 20}%`, height: '100%', background: i === 0 ? '#00d4aa' : i === 1 ? '#3b82f6' : '#f59e0b', borderRadius: '2px' }} />
+                    <div style={{ height: '4px', background: 'var(--well)', borderRadius: '2px', overflow: 'hidden' }}>
+                      <div style={{ width: `${100 - i * 20}%`, height: '100%', background: i === 0 ? 'var(--accent)' : i === 1 ? 'var(--blue)' : 'var(--amber)', borderRadius: '2px' }} />
                     </div>
                   </div>
                 </div>
@@ -230,11 +230,11 @@ function RoutesPage() {
           <div className="card-title">Statut du réseau</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
             <div className="mini-stat">
-              <div className="mini-num" style={{ fontSize: '24px', color: '#00d4aa' }}>{display.filter((r) => r.isActive).length}</div>
+              <div className="mini-num" style={{ fontSize: '24px', color: 'var(--accent)' }}>{display.filter((r) => r.isActive).length}</div>
               <div className="mini-label">Routes actives</div>
             </div>
             <div className="mini-stat">
-              <div className="mini-num" style={{ fontSize: '24px', color: '#ef4444' }}>{display.filter((r) => !r.isActive).length}</div>
+              <div className="mini-num" style={{ fontSize: '24px', color: 'var(--red)' }}>{display.filter((r) => !r.isActive).length}</div>
               <div className="mini-label">Routes inactives</div>
             </div>
           </div>

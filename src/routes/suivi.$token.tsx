@@ -4,6 +4,7 @@ import { convexQuery } from '@convex-dev/react-query'
 import { api } from '../../convex/_generated/api'
 import { LiveMap } from '../components/LiveMap'
 import { eventColors, formatDateTime, statusClasses, statusLabels } from '../components/shipmentMeta'
+import { Ambient } from '../components/Ambient'
 
 /**
  * Suivi public destiné au client final : accessible sans compte via un
@@ -30,6 +31,7 @@ function PublicTrackingPage() {
   if (!data) {
     return (
       <div className="public-shell">
+        <Ambient />
         <div className="public-card">
           <div className="public-brand">Suivi d'expédition</div>
           <div className="empty-state">Ce lien de suivi n'existe pas ou a été désactivé par l'expéditeur.</div>
@@ -43,6 +45,7 @@ function PublicTrackingPage() {
 
   return (
     <div className="public-shell">
+        <Ambient />
       <div className="public-card">
         <div className="public-brand">{data.organizationName || "Suivi d'expédition"}</div>
         <div className="public-ref">{data.reference}</div>
@@ -108,7 +111,7 @@ function PublicTrackingPage() {
           {data.events.map((e) => (
             <div key={`${e.at}-${e.eventType}`} className="tl-item">
               <div className="tl-left">
-                <div className="tl-dot" style={{ background: eventColors[e.eventType] || '#3d4a5c', width: '9px', height: '9px' }} />
+                <div className="tl-dot" style={{ background: eventColors[e.eventType] || 'var(--faint)', width: '9px', height: '9px' }} />
                 <div className="tl-line" />
               </div>
               <div className="tl-content">

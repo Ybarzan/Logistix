@@ -21,10 +21,10 @@ const TILE_URL = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
 const ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
 
 function hubColor(h: MapHub): string {
-  if (h.muted) return '#3d4a5c'
-  if ((h.loadPct ?? 0) > 90) return '#ef4444'
-  if ((h.loadPct ?? 0) > 75) return '#f59e0b'
-  return '#3b82f6'
+  if (h.muted) return '#56627e'
+  if ((h.loadPct ?? 0) > 90) return '#ff5f6d'
+  if ((h.loadPct ?? 0) > 75) return '#ffb547'
+  return '#5b8cff'
 }
 
 function escapeHtml(s: string): string {
@@ -79,10 +79,10 @@ export function LiveMap({ hubs = [], trucks = [], trail = [], plannedLine, heigh
     const points: Array<[number, number]> = []
 
     if (plannedLine) {
-      L.polyline(plannedLine, { color: '#3d4a5c', weight: 2, dashArray: '6 6' }).addTo(layer)
+      L.polyline(plannedLine, { color: '#56627e', weight: 2, dashArray: '6 6' }).addTo(layer)
     }
     if (trail.length > 1) {
-      L.polyline(trail, { color: '#00d4aa', weight: 3, opacity: 0.7 }).addTo(layer)
+      L.polyline(trail, { color: '#1fe0b8', weight: 3, opacity: 0.7 }).addTo(layer)
     }
     for (const h of hubs) {
       points.push([h.lat, h.lng])
@@ -98,7 +98,7 @@ export function LiveMap({ hubs = [], trucks = [], trail = [], plannedLine, heigh
     }
     for (const t of trucks) {
       points.push([t.lat, t.lng])
-      const color = t.stale ? '#f59e0b' : '#00d4aa'
+      const color = t.stale ? '#ffb547' : '#1fe0b8'
       const marker = L.circleMarker([t.lat, t.lng], {
         radius: 8,
         color,

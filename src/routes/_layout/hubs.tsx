@@ -44,23 +44,23 @@ function HubCard({
   onEdit?: () => void
 }) {
   const loadPct = Math.round((hub.currentLoad / hub.capacity) * 100)
-  const loadColor = loadPct > 85 ? '#ef4444' : loadPct > 70 ? '#f59e0b' : '#00d4aa'
+  const loadColor = loadPct > 85 ? 'var(--red)' : loadPct > 70 ? 'var(--amber)' : 'var(--accent)'
   return (
     <div className="card" style={{ cursor: real ? 'pointer' : 'default' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
         <div>
-          <div style={{ fontSize: '15px', fontWeight: 600, color: '#fff' }}>{hub.name}</div>
-          <div style={{ fontSize: '11px', fontFamily: "'DM Mono', monospace", color: '#4a5568', marginTop: '2px' }}>
+          <div style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text)' }}>{hub.name}</div>
+          <div style={{ fontSize: '11px', fontFamily: 'var(--font)', color: 'var(--faint)', marginTop: '2px' }}>
             {hub.code} · {hub.city}, {hub.country}
           </div>
         </div>
         <div style={{
           fontSize: '10px',
-          fontFamily: "'DM Mono', monospace",
+          fontFamily: 'var(--font)',
           padding: '3px 8px',
           borderRadius: '10px',
-          background: hub.isActive ? '#00d4aa14' : '#ef444414',
-          color: hub.isActive ? '#00d4aa' : '#ef4444',
+          background: hub.isActive ? 'rgba(31, 224, 184, 0.08)' : 'rgba(255, 95, 109, 0.08)',
+          color: hub.isActive ? 'var(--accent)' : 'var(--red)',
         }}>
           {hub.isActive ? 'Actif' : 'Inactif'}
         </div>
@@ -68,22 +68,22 @@ function HubCard({
 
       <div style={{ marginBottom: '12px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
-          <span style={{ fontSize: '11px', fontFamily: "'DM Mono', monospace", color: '#4a5568' }}>Charge</span>
-          <span style={{ fontSize: '12px', fontFamily: "'DM Mono', monospace", color: loadColor }}>{loadPct}%</span>
+          <span style={{ fontSize: '11px', fontFamily: 'var(--font)', color: 'var(--faint)' }}>Charge</span>
+          <span style={{ fontSize: '12px', fontFamily: 'var(--font)', color: loadColor }}>{loadPct}%</span>
         </div>
         <div className="bar-track">
           <div className="bar-fill" style={{ width: `${loadPct}%`, background: loadColor }} />
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', borderTop: '1px solid #1e2535', paddingTop: '12px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', borderTop: '1px solid var(--line)', paddingTop: '12px' }}>
         <div className="mini-stat" style={{ textAlign: 'left', padding: '0' }}>
-          <div style={{ fontSize: '16px', fontWeight: 600, color: '#fff' }}>{hub.currentLoad.toLocaleString()}</div>
-          <div style={{ fontSize: '10px', fontFamily: "'DM Mono', monospace", color: '#4a5568' }}>Charge actuelle (kg)</div>
+          <div style={{ fontSize: '16px', fontWeight: 600, color: 'var(--text)' }}>{hub.currentLoad.toLocaleString()}</div>
+          <div style={{ fontSize: '10px', fontFamily: 'var(--font)', color: 'var(--faint)' }}>Charge actuelle (kg)</div>
         </div>
         <div className="mini-stat" style={{ textAlign: 'left', padding: '0' }}>
-          <div style={{ fontSize: '16px', fontWeight: 600, color: '#fff' }}>{hub.capacity.toLocaleString()}</div>
-          <div style={{ fontSize: '10px', fontFamily: "'DM Mono', monospace", color: '#4a5568' }}>Capacité (kg)</div>
+          <div style={{ fontSize: '16px', fontWeight: 600, color: 'var(--text)' }}>{hub.capacity.toLocaleString()}</div>
+          <div style={{ fontSize: '10px', fontFamily: 'var(--font)', color: 'var(--faint)' }}>Capacité (kg)</div>
         </div>
       </div>
 
@@ -95,12 +95,12 @@ function HubCard({
           )}
         </div>
       )}
-      <div style={{ marginTop: '10px', fontSize: '10px', fontFamily: "'DM Mono', monospace", color: '#3d4a5c' }}>
+      <div style={{ marginTop: '10px', fontSize: '10px', fontFamily: 'var(--font)', color: 'var(--faint)' }}>
         {hub.lat.toFixed(4)}°, {hub.lng.toFixed(4)}°
       </div>
 
       {real && canManage && onToggle && onEdit && (
-        <div style={{ display: 'flex', gap: '8px', marginTop: '12px', borderTop: '1px solid #1e2535', paddingTop: '12px' }}>
+        <div style={{ display: 'flex', gap: '8px', marginTop: '12px', borderTop: '1px solid var(--line)', paddingTop: '12px' }}>
           <button type="button" className="btn btn-sm" onClick={onEdit}>Modifier</button>
           <button type="button" className={`btn btn-sm ${hub.isActive ? 'btn-danger' : ''}`} onClick={onToggle}>
             {hub.isActive ? 'Désactiver' : 'Activer'}

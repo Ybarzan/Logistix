@@ -387,7 +387,7 @@ export function PredictionRow({ shipment }: { shipment: Doc<'shipments'> }) {
     <div className="info-row" style={{ alignItems: 'flex-start' }}>
       <span className="info-label">Arrivée prédite</span>
       <span className="info-value" style={{ textAlign: 'right' }}>
-        <span style={{ color: late ? '#ef4444' : '#00d4aa' }}>
+        <span style={{ color: late ? 'var(--red)' : 'var(--accent)' }}>
           {day(p.eta)} {time(p.eta)}
           {overrunMin !== null && Math.abs(overrunMin) >= 5 && (
             <> ({overrunMin > 0 ? '+' : '−'}{Math.abs(overrunMin)} min vs engagement)</>

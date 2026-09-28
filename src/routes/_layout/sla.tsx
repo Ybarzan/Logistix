@@ -56,7 +56,7 @@ function SLAPage() {
                   <div className="bar-track">
                     <div
                       className="bar-fill"
-                      style={{ width: `${(reason.count / maxReason) * 100}%`, background: '#f59e0b' }}
+                      style={{ width: `${(reason.count / maxReason) * 100}%`, background: 'var(--amber)' }}
                     />
                   </div>
                   <span className="bar-val">{reason.count}</span>
@@ -70,27 +70,27 @@ function SLAPage() {
           <div className="card-title">Statut des expéditions</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
             <div className="mini-stat">
-              <div className="mini-num" style={{ fontSize: '20px', color: '#f59e0b' }}>{stats.statusCounts.pending}</div>
+              <div className="mini-num" style={{ fontSize: '20px', color: 'var(--amber)' }}>{stats.statusCounts.pending}</div>
               <div className="mini-label">En attente</div>
             </div>
             <div className="mini-stat">
-              <div className="mini-num" style={{ fontSize: '20px', color: '#3b82f6' }}>{stats.statusCounts.loading}</div>
+              <div className="mini-num" style={{ fontSize: '20px', color: 'var(--blue)' }}>{stats.statusCounts.loading}</div>
               <div className="mini-label">Chargement</div>
             </div>
             <div className="mini-stat">
-              <div className="mini-num" style={{ fontSize: '20px', color: '#3b82f6' }}>{stats.statusCounts.in_transit}</div>
+              <div className="mini-num" style={{ fontSize: '20px', color: 'var(--blue)' }}>{stats.statusCounts.in_transit}</div>
               <div className="mini-label">En transit</div>
             </div>
             <div className="mini-stat">
-              <div className="mini-num" style={{ fontSize: '20px', color: '#00d4aa' }}>{stats.statusCounts.delivered}</div>
+              <div className="mini-num" style={{ fontSize: '20px', color: 'var(--accent)' }}>{stats.statusCounts.delivered}</div>
               <div className="mini-label">Livrées</div>
             </div>
             <div className="mini-stat">
-              <div className="mini-num" style={{ fontSize: '20px', color: '#ef4444' }}>{stats.statusCounts.delayed}</div>
+              <div className="mini-num" style={{ fontSize: '20px', color: 'var(--red)' }}>{stats.statusCounts.delayed}</div>
               <div className="mini-label">Retards</div>
             </div>
             <div className="mini-stat">
-              <div className="mini-num" style={{ fontSize: '20px', color: '#3d4a5c' }}>{stats.statusCounts.cancelled}</div>
+              <div className="mini-num" style={{ fontSize: '20px', color: 'var(--faint)' }}>{stats.statusCounts.cancelled}</div>
               <div className="mini-label">Annulées</div>
             </div>
           </div>
@@ -110,8 +110,8 @@ function SLAPage() {
             {stats.slaByRoute.map((route) => (
               <div key={route.routeId ?? 'default'} className="card" style={{ padding: '14px 16px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                  <span style={{ fontSize: '13px', color: '#c8d0e0', fontWeight: 500 }}>{route.name}</span>
-                  <span style={{ fontSize: '12px', fontFamily: "'DM Mono', monospace", color: route.slaRate >= 85 ? '#00d4aa' : route.slaRate >= 70 ? '#f59e0b' : '#ef4444' }}>
+                  <span style={{ fontSize: '13px', color: 'var(--text-2)', fontWeight: 500 }}>{route.name}</span>
+                  <span style={{ fontSize: '12px', fontFamily: 'var(--font)', color: route.slaRate >= 85 ? 'var(--accent)' : route.slaRate >= 70 ? 'var(--amber)' : 'var(--red)' }}>
                     {route.slaRate}%
                   </span>
                 </div>
@@ -120,11 +120,11 @@ function SLAPage() {
                     className="bar-fill"
                     style={{
                       width: `${Math.max(2, route.slaRate)}%`,
-                      background: route.slaRate >= 85 ? '#00d4aa' : route.slaRate >= 70 ? '#f59e0b' : '#ef4444',
+                      background: route.slaRate >= 85 ? 'var(--accent)' : route.slaRate >= 70 ? 'var(--amber)' : 'var(--red)',
                     }}
                   />
                 </div>
-                <div style={{ fontSize: '11px', fontFamily: "'DM Mono', monospace", color: '#4a5568' }}>
+                <div style={{ fontSize: '11px', fontFamily: 'var(--font)', color: 'var(--faint)' }}>
                   {route.delivered} livrées · {route.onTime} à l'heure
                 </div>
               </div>

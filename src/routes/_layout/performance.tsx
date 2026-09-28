@@ -49,7 +49,7 @@ function PerformancePage() {
           <div style={{ display: 'flex', alignItems: 'flex-end', gap: '10px', height: '160px', paddingTop: '8px' }}>
             {stats.volumePerDay.map((day) => (
               <div key={day.label} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', height: '100%', justifyContent: 'flex-end' }}>
-                <span style={{ fontSize: '11px', fontFamily: "'DM Mono', monospace", color: day.count > 0 ? '#00d4aa' : '#3d4a5c' }}>
+                <span style={{ fontSize: '11px', fontFamily: 'var(--font)', color: day.count > 0 ? 'var(--accent)' : 'var(--faint)' }}>
                   {day.count > 0 ? day.count : ''}
                 </span>
                 <div
@@ -58,12 +58,12 @@ function PerformancePage() {
                     width: '100%',
                     maxWidth: '38px',
                     height: `${day.count === 0 ? 4 : Math.max(6, (day.count / maxVolume) * 100)}%`,
-                    background: day.count > 0 ? '#00d4aa' : '#1a2135',
+                    background: day.count > 0 ? 'var(--accent)' : 'var(--well)',
                     borderRadius: '4px 4px 0 0',
                     opacity: day.count > 0 ? 0.85 : 1,
                   }}
                 />
-                <span style={{ fontSize: '9px', fontFamily: "'DM Mono', monospace", color: '#3d4a5c' }}>{day.label}</span>
+                <span style={{ fontSize: '9px', fontFamily: 'var(--font)', color: 'var(--faint)' }}>{day.label}</span>
               </div>
             ))}
           </div>
@@ -83,7 +83,7 @@ function PerformancePage() {
                       className="bar-fill"
                       style={{
                         width: `${Math.min(100, hub.loadPct)}%`,
-                        background: hub.loadPct > 85 ? '#ef4444' : hub.loadPct > 70 ? '#f59e0b' : '#00d4aa',
+                        background: hub.loadPct > 85 ? 'var(--red)' : hub.loadPct > 70 ? 'var(--amber)' : 'var(--accent)',
                       }}
                     />
                   </div>
@@ -94,11 +94,11 @@ function PerformancePage() {
           </div>
           <div className="stat-pair">
             <div className="mini-stat" style={{ textAlign: 'left', padding: 0 }}>
-              <div className="mini-num" style={{ fontSize: '18px', color: '#00d4aa' }}>{stats.hubThroughput.reduce((acc, h) => acc + h.throughput, 0)}</div>
+              <div className="mini-num" style={{ fontSize: '18px', color: 'var(--accent)' }}>{stats.hubThroughput.reduce((acc, h) => acc + h.throughput, 0)}</div>
               <div className="mini-label">Expéditions liées aux hubs</div>
             </div>
             <div className="mini-stat" style={{ textAlign: 'left', padding: 0 }}>
-              <div className="mini-num" style={{ fontSize: '18px', color: '#3b82f6' }}>{stats.resolvedIncidents}</div>
+              <div className="mini-num" style={{ fontSize: '18px', color: 'var(--blue)' }}>{stats.resolvedIncidents}</div>
               <div className="mini-label">Incidents résolus</div>
             </div>
           </div>
@@ -110,11 +110,11 @@ function PerformancePage() {
           <div className="card-title">Engagement SLA</div>
           <div className="gauge-wrap">
             <svg className="gauge-svg" viewBox="0 0 120 70">
-              <path d="M15 65 A50 50 0 0 1 105 65" fill="none" stroke="#1a2135" strokeWidth="10" strokeLinecap="round" />
+              <path d="M15 65 A50 50 0 0 1 105 65" fill="none" stroke="var(--well)" strokeWidth="10" strokeLinecap="round" />
               <path
                 d="M15 65 A50 50 0 0 1 105 65"
                 fill="none"
-                stroke="#00d4aa"
+                stroke="var(--accent)"
                 strokeWidth="10"
                 strokeLinecap="round"
                 strokeDasharray="157"
@@ -130,11 +130,11 @@ function PerformancePage() {
           <div className="card-title">Capital incidents</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
             <div className="mini-stat">
-              <div className="mini-num" style={{ fontSize: '22px', color: '#ef4444' }}>{stats.openIncidents}</div>
+              <div className="mini-num" style={{ fontSize: '22px', color: 'var(--red)' }}>{stats.openIncidents}</div>
               <div className="mini-label">Ouverts</div>
             </div>
             <div className="mini-stat">
-              <div className="mini-num" style={{ fontSize: '22px', color: '#00d4aa' }}>{stats.resolvedIncidents}</div>
+              <div className="mini-num" style={{ fontSize: '22px', color: 'var(--accent)' }}>{stats.resolvedIncidents}</div>
               <div className="mini-label">Résolus</div>
             </div>
             <div className="mini-stat" style={{ gridColumn: '1 / -1' }}>
@@ -143,7 +143,7 @@ function PerformancePage() {
                   className="bar-fill"
                   style={{
                     width: `${stats.resolutionRate}%`,
-                    background: '#00d4aa',
+                    background: 'var(--accent)',
                   }}
                 />
               </div>

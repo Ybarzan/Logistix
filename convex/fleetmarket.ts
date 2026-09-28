@@ -314,6 +314,7 @@ const proposalFields = v.object({
   id: v.number(),
   carrierCompanyName: v.string(),
   carrierComplianceScore: v.optional(v.number()),
+  carrierId: v.optional(v.number()),
   truckRegistration: v.optional(v.string()),
   status: v.string(),
   proposedAt: v.optional(v.number()),
@@ -363,6 +364,7 @@ function parseProposals(body: unknown) {
         carrierCompanyName: typeof p.carrierCompanyName === "string" ? p.carrierCompanyName : "Transporteur",
         status: typeof p.status === "string" ? p.status : "PROPOSED",
         ...(score !== undefined ? { carrierComplianceScore: score } : {}),
+        ...(typeof p.carrierId === "number" ? { carrierId: p.carrierId } : {}),
         ...(truck !== undefined ? { truckRegistration: truck } : {}),
         ...(at !== null ? { proposedAt: at } : {}),
       };
@@ -502,6 +504,7 @@ const loadUpdate = v.object({
       proposalId: v.number(),
       carrierName: v.string(),
       carrierComplianceScore: v.optional(v.number()),
+      carrierId: v.optional(v.number()),
       truckRegistration: v.optional(v.string()),
     }),
   ),
@@ -541,6 +544,7 @@ export const applySync = internalMutation({
               ...(u.accepted.carrierComplianceScore !== undefined
                 ? { carrierComplianceScore: u.accepted.carrierComplianceScore }
                 : {}),
+              ...(u.accepted.carrierId !== undefined ? { carrierId: u.accepted.carrierId } : {}),
             }
           : {}),
       };
@@ -617,6 +621,7 @@ export const syncOrg = internalAction({
               ...(accepted.carrierComplianceScore !== undefined
                 ? { carrierComplianceScore: accepted.carrierComplianceScore }
                 : {}),
+              ...(accepted.carrierId !== undefined ? { carrierId: accepted.carrierId } : {}),
               ...(accepted.truckRegistration !== undefined ? { truckRegistration: accepted.truckRegistration } : {}),
             };
           }

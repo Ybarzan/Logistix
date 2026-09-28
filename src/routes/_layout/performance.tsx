@@ -2,6 +2,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { useSuspenseQuery } from '@tanstack/react-query'
 import { convexQuery } from '@convex-dev/react-query'
 import { api } from '../../../convex/_generated/api'
+import { CarrierScorecards } from '../../components/CarrierScorecards'
 
 export const Route = createFileRoute('/_layout/performance')({
   head: () => ({ meta: [{ title: 'Performance — Logistix' }] }),
@@ -151,6 +152,7 @@ function PerformancePage() {
           </div>
         </div>
       </div>
+      <CarrierScorecards />
     </>
   )
 }

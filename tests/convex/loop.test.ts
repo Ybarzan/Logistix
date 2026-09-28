@@ -140,3 +140,30 @@ describe("CO2", () => {
     await expect(a.as.mutation(api.co2.setFactor, { factorKgPerTkm: 50 })).rejects.toThrow(/Facteur invalide/);
   });
 });
+
+describe("score des transporteurs", () => {
+  it("agrège l'historique réel par transporteur FleetMarket et flotte propre", async () => {
+    const { t, a, lyon, mrs } = await setup();
+    const now = Date.now();
+    const mk = (over: Record<string, unknown>) =>
+      t.run((ctx) =>
+        ctx.db.insert("shipments", {
+          orgId: a.orgId, reference: `R${Math.random()}`, fromHubId: lyon, toHubId: mrs, status: "delivered",
+          weight: 1, priority: "normal", customerName: "C", createdAt: now, estimatedDelivery: now,
+          ...over,
+        }),
+      );
+    const fm = (carrierId: number) => ({ loadId: 1, status: "DONE", proposalCount: 1, postedAt: now, carrierName: `T${carrierId}`, carrierId, carrierComplianceScore: 95 });
+    await mk({ fleetmarket: fm(7), actualDelivery: now - 60_000 });
+    await mk({ fleetmarket: fm(7), actualDelivery: now + 30 * 60_000 });
+    await mk({ fleetmarket: fm(8), actualDelivery: now });
+    await mk({ truckRegistration: "OWN-1", actualDelivery: now });
+    const cards = await a.as.query(api.carriers.scorecards, {});
+    const t7 = cards.find((c) => c.carrierId === 7);
+    expect(t7).toMatchObject({ shipments: 2, delivered: 2, onTime: 1, onTimeRate: 50, avgDelayMin: 30, lastComplianceScore: 95 });
+    expect(cards.find((c) => c.kind === "own_fleet")).toMatchObject({ delivered: 1, onTimeRate: 100 });
+    // Une autre organisation ne voit rien.
+    const b = await orgWithUser(t, "admin", "org-b");
+    expect(await b.as.query(api.carriers.scorecards, {})).toEqual([]);
+  });
+});

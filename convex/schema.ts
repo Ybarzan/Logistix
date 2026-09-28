@@ -26,6 +26,8 @@ export const fleetmarketLinkSchema = v.object({
   acceptedProposalId: v.optional(v.number()),
   carrierName: v.optional(v.string()),
   carrierComplianceScore: v.optional(v.number()),
+  // Identifiant stable du transporteur côté FleetMarket (pour son historique chez nous).
+  carrierId: v.optional(v.number()),
 });
 
 export const customsSchema = v.object({

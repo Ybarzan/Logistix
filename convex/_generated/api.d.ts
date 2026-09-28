@@ -11,6 +11,7 @@
 import type * as apiKeys from "../apiKeys.js";
 import type * as auth from "../auth.js";
 import type * as automation from "../automation.js";
+import type * as carriers from "../carriers.js";
 import type * as co2 from "../co2.js";
 import type * as crons from "../crons.js";
 import type * as customsRules from "../customsRules.js";
@@ -48,6 +49,7 @@ declare const fullApi: ApiFromModules<{
   apiKeys: typeof apiKeys;
   auth: typeof auth;
   automation: typeof automation;
+  carriers: typeof carriers;
   co2: typeof co2;
   crons: typeof crons;
   customsRules: typeof customsRules;

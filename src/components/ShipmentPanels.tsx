@@ -26,6 +26,15 @@ const FM_STATUS: Record<string, string> = {
 /** Capacité de secours FleetMarket : publier, comparer, accepter. */
 export function FleetMarketPanel({ shipment, canEdit }: { shipment: Doc<'shipments'>; canEdit: boolean }) {
   const { data: config } = useSuspenseQuery(convexQuery(api.fleetmarket.getConfig, {}))
+  const { data: scorecards } = useSuspenseQuery(convexQuery(api.carriers.scorecards, {}))
+  const historyOf = (carrierId?: number) =>
+    carrierId === undefined ? undefined : scorecards.find((c) => c.carrierId === carrierId)
+  /** Classement : historique réel chez vous (≥ 3 livraisons) d'abord, puis conformité fleet-hub. */
+  const rankOf = (p: { carrierId?: number; carrierComplianceScore?: number }) => {
+    const h = historyOf(p.carrierId)
+    const own = h && h.delivered >= 3 && h.onTimeRate !== null ? h.onTimeRate : null
+    return (own ?? -1) * 1000 + (p.carrierComplianceScore ?? -1)
+  }
   const publish = useMutation(api.fleetmarket.publish)
   const fetchProposals = useAction(api.fleetmarket.proposals)
   const accept = useAction(api.fleetmarket.acceptProposal)
@@ -149,10 +158,21 @@ export function FleetMarketPanel({ shipment, canEdit }: { shipment: Doc<'shipmen
               <tbody>
                 {proposals
                   .filter((p) => p.status === 'PROPOSED')
-                  .sort((a, b) => (b.carrierComplianceScore ?? -1) - (a.carrierComplianceScore ?? -1))
+                  .sort((a, b) => rankOf(b) - rankOf(a))
                   .map((p) => (
                     <tr key={p.id}>
-                      <td>{p.carrierCompanyName}</td>
+                      <td>
+                        {p.carrierCompanyName}
+                        <div className="prediction-detail" style={{ marginLeft: 0 }}>
+                          {(() => {
+                            const h = historyOf(p.carrierId)
+                            if (!h || h.shipments === 0) return 'Jamais travaillé avec vous'
+                            return h.delivered > 0
+                              ? `Chez vous : ${h.onTime}/${h.delivered} à l'heure${h.delivered < 3 ? ' (peu de recul)' : ''}`
+                              : `Chez vous : ${h.shipments} course(s) en cours`
+                          })()}
+                        </div>
+                      </td>
                       <td className="mono">
                         {p.carrierComplianceScore !== undefined ? `${p.carrierComplianceScore}%` : '—'}
                       </td>

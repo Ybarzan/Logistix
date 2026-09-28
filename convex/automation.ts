@@ -201,7 +201,16 @@ export const detectHubOverloadForOrg = internalMutation({
           createdAt: now,
         });
         created += 1;
-      } else if (!overloaded && existing?.source === "auto") {
+      } else if (overloaded && existing?.predicted === true) {
+        // La saturation annoncée s'est produite : l'incident prédit devient avéré.
+        await ctx.db.patch("incidents", existing._id, {
+          title: `Surcharge confirmée : ${hub.name}`,
+          description: `Capacité à ${Math.round(ratio * 100)}% — redirection recommandée`,
+          predicted: false,
+          severity: ratio >= 1 ? "high" : "medium",
+        });
+      } else if (!overloaded && existing?.source === "auto" && existing.predicted !== true) {
+        // Les saturations PRÉVUES sont gérées par hubForecast.ts, pas ici.
         await resolveIncident(ctx, existing, now);
         resolved += 1;
       }
@@ -225,6 +234,7 @@ export const runAutomation = internalAction({
     );
     for (const orgId of orgIds) {
       await ctx.runMutation(internal.eta.predictForOrg, { orgId, now });
+      await ctx.runMutation(internal.hubForecast.detectPredictedSaturationForOrg, { orgId, now });
       await ctx.runMutation(internal.automation.detectDelaysForOrg, { orgId, now });
       await ctx.runMutation(internal.automation.detectHubOverloadForOrg, { orgId, now });
       await ctx.runMutation(internal.praxio.detectCustomsRiskForOrg, { orgId, now });

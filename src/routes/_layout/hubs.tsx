@@ -34,8 +34,10 @@ function HubCard({
   canManage,
   onToggle,
   onEdit,
+  forecast,
 }: {
   hub: MockHub
+  forecast?: { inboundKg: number; arrivals: number; peakPct: number; crossesAt?: number }
   real: boolean
   canManage: boolean
   onToggle?: () => void
@@ -77,14 +79,22 @@ function HubCard({
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', borderTop: '1px solid #1e2535', paddingTop: '12px' }}>
         <div className="mini-stat" style={{ textAlign: 'left', padding: '0' }}>
           <div style={{ fontSize: '16px', fontWeight: 600, color: '#fff' }}>{hub.currentLoad.toLocaleString()}</div>
-          <div style={{ fontSize: '10px', fontFamily: "'DM Mono', monospace", color: '#4a5568' }}>Colis actuels</div>
+          <div style={{ fontSize: '10px', fontFamily: "'DM Mono', monospace", color: '#4a5568' }}>Charge actuelle (kg)</div>
         </div>
         <div className="mini-stat" style={{ textAlign: 'left', padding: '0' }}>
           <div style={{ fontSize: '16px', fontWeight: 600, color: '#fff' }}>{hub.capacity.toLocaleString()}</div>
-          <div style={{ fontSize: '10px', fontFamily: "'DM Mono', monospace", color: '#4a5568' }}>Capacité max</div>
+          <div style={{ fontSize: '10px', fontFamily: "'DM Mono', monospace", color: '#4a5568' }}>Capacité (kg)</div>
         </div>
       </div>
 
+      {forecast && forecast.arrivals > 0 && (
+        <div className={`hub-forecast${forecast.crossesAt !== undefined ? ' warn' : ''}`}>
+          24 h : +{(forecast.inboundKg / 1000).toLocaleString('fr-FR', { maximumFractionDigits: 1 })} t en arrivée ({forecast.arrivals}) → pic {forecast.peakPct}%
+          {forecast.crossesAt !== undefined && (
+            <> · saturation vers {new Date(forecast.crossesAt).toLocaleString('fr-FR', { weekday: 'short', hour: '2-digit', minute: '2-digit' })}</>
+          )}
+        </div>
+      )}
       <div style={{ marginTop: '10px', fontSize: '10px', fontFamily: "'DM Mono', monospace", color: '#3d4a5c' }}>
         {hub.lat.toFixed(4)}°, {hub.lng.toFixed(4)}°
       </div>
@@ -105,6 +115,8 @@ function HubsPage() {
   const queryClient = useQueryClient()
   const { data: hubs } = useSuspenseQuery(convexQuery(api.hubs.list, {}))
   const { data: network } = useSuspenseQuery(convexQuery(api.fleethub.networkMap, {}))
+  const { data: forecasts } = useSuspenseQuery(convexQuery(api.hubForecast.forecast, {}))
+  const forecastByHub = new Map(forecasts.map((f) => [f.hubId as string, f]))
   const { data: currentUser } = useSuspenseQuery(convexQuery(api.organizations.currentUser, {}))
   const createHub = useMutation(api.hubs.create)
   const updateHub = useMutation(api.hubs.update)
@@ -218,6 +230,7 @@ function HubsPage() {
             <HubCard
               key={hub._id}
               hub={hub}
+              forecast={forecastByHub.get(hub._id)}
               real
               canManage={canManage}
               onToggle={() => toggleActive(hub)}
@@ -268,10 +281,10 @@ function HubsPage() {
               </Field>
             </div>
             <div className="field-row">
-              <Field label="Capacité max">
+              <Field label="Capacité (kg)">
                 <NumberInput min={0} value={createForm.capacity} onChange={(e) => setCreateForm({ ...createForm, capacity: e.target.value })} />
               </Field>
-              <Field label="Colis actuels">
+              <Field label="Charge actuelle (kg)">
                 <NumberInput min={0} value={createForm.currentLoad} onChange={(e) => setCreateForm({ ...createForm, currentLoad: e.target.value })} />
               </Field>
             </div>
@@ -313,12 +326,12 @@ function HubsPage() {
               <Field label="Pays">
                 <TextInput value={editForm.country} onChange={(e) => setEditForm({ ...editForm, country: e.target.value })} />
               </Field>
-              <Field label="Colis actuels">
+              <Field label="Charge actuelle (kg)">
                 <NumberInput min={0} value={editForm.currentLoad} onChange={(e) => setEditForm({ ...editForm, currentLoad: e.target.value })} />
               </Field>
             </div>
             <div className="field-row">
-              <Field label="Capacité max">
+              <Field label="Capacité (kg)">
                 <NumberInput min={0} value={editForm.capacity} onChange={(e) => setEditForm({ ...editForm, capacity: e.target.value })} />
               </Field>
               <Field label="Latitude">

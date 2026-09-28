@@ -19,6 +19,8 @@ import type * as etaModel from "../etaModel.js";
 import type * as fleethub from "../fleethub.js";
 import type * as fleetmarket from "../fleetmarket.js";
 import type * as http from "../http.js";
+import type * as hubForecast from "../hubForecast.js";
+import type * as hubForecastModel from "../hubForecastModel.js";
 import type * as hubs from "../hubs.js";
 import type * as incidents from "../incidents.js";
 import type * as orgContext from "../orgContext.js";
@@ -54,6 +56,8 @@ declare const fullApi: ApiFromModules<{
   fleethub: typeof fleethub;
   fleetmarket: typeof fleetmarket;
   http: typeof http;
+  hubForecast: typeof hubForecast;
+  hubForecastModel: typeof hubForecastModel;
   hubs: typeof hubs;
   incidents: typeof incidents;
   orgContext: typeof orgContext;

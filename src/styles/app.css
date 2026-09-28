@@ -276,3 +276,5 @@ body { font-family: 'Syne', sans-serif; background: #080b10; color: #e8eaf0; min
 }
 .api-doc { font-family: 'DM Mono', monospace; font-size: 11px; color: #8a96b0; background: #080b10; border: 1px solid #1e2535; border-radius: 8px; padding: 12px; overflow-x: auto; white-space: pre; margin-top: 8px; }
 .webhook-row { border-top: 1px solid #1e2535; padding-top: 10px; margin-top: 12px; }
+.hub-forecast { margin-top: 10px; font-family: 'DM Mono', monospace; font-size: 11px; color: #6b7a99; }
+.hub-forecast.warn { color: #f59e0b; }

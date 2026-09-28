@@ -29,7 +29,8 @@ describe("liste paginée des expéditions", () => {
     const seen = new Set<string>();
     let cursor: string | null = null;
     for (;;) {
-      const res = await a.as.query(api.shipments.search, { ...page(20, cursor) });
+      const res: { page: Array<{ _id: string }>; isDone: boolean; continueCursor: string } =
+        await a.as.query(api.shipments.search, { ...page(20, cursor) });
       res.page.forEach((s) => seen.add(s._id));
       if (res.isDone) break;
       cursor = res.continueCursor;

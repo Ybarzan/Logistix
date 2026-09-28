@@ -174,8 +174,12 @@ export default defineSchema({
     customs: v.optional(customsSchema),
     // ETA prédictive (voir etaModel.ts), recalculée à chaque position GPS et par le cron.
     prediction: v.optional(predictionSchema),
+    // Texte indexé pour la recherche (référence, client, référence client).
+    searchText: v.optional(v.string()),
     orgId: v.optional(v.id("organizations")),
   }).index("by_reference", ["reference"])
+    .index("by_org_and_weight", ["orgId", "weight"])
+    .searchIndex("search_text", { searchField: "searchText", filterFields: ["orgId", "status", "priority"] })
     .index("by_tracking_token", ["trackingToken"])
     .index("by_status", ["status"])
     .index("by_from_hub", ["fromHubId"])

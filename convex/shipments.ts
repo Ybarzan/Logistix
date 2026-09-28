@@ -1,5 +1,6 @@
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { paginationOptsValidator } from "convex/server";
+import { internalMutation, mutation, query } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { getOrgScope, requireOwned, requireRole } from "./orgContext";
 import { recordTrackingEvent } from "./tracking";
@@ -50,6 +51,7 @@ const shipmentFields = v.object({
   declaredValueEur: v.optional(v.number()),
   customs: v.optional(customsSchema),
   prediction: v.optional(predictionSchema),
+  searchText: v.optional(v.string()),
   orgId: v.optional(v.id("organizations")),
 });
 
@@ -78,6 +80,125 @@ export const list = query({
       .withIndex("by_org", (q) => q.eq("orgId", scope.orgId))
       .order("desc")
       .take(limit);
+  },
+});
+
+/** Texte de recherche : référence (avec et sans tirets), client, référence client. */
+export function buildSearchText(s: { reference: string; customerName: string; customerRef?: string }): string {
+  return [s.reference, s.reference.replace(/-/g, " "), s.customerName, s.customerRef ?? ""].join(" ").trim();
+}
+
+const COUNT_CAP = 5000;
+
+/** Compteurs exacts par statut (plafonnés à 5 000 pour rester dans les limites de lecture). */
+export const statusCounts = query({
+  args: {},
+  returns: v.object({
+    counts: v.record(v.string(), v.number()),
+    capped: v.boolean(),
+  }),
+  handler: async (ctx) => {
+    const scope = await getOrgScope(ctx);
+    const counts: Record<string, number> = {};
+    let capped = false;
+    if (!scope) return { counts, capped };
+    for (const status of ["pending", "loading", "in_transit", "delivered", "delayed", "cancelled"] as const) {
+      const rows = await ctx.db
+        .query("shipments")
+        .withIndex("by_org_and_status", (q) => q.eq("orgId", scope.orgId).eq("status", status))
+        .take(COUNT_CAP + 1);
+      counts[status] = Math.min(rows.length, COUNT_CAP);
+      if (rows.length > COUNT_CAP) capped = true;
+    }
+    counts.all = Object.values(counts).reduce((a, b) => a + b, 0);
+    return { counts, capped };
+  },
+});
+
+/**
+ * Liste paginée côté serveur (plus de plafond à 50) avec filtres et
+ * recherche plein texte indexée. Tri : récentes (index org/date),
+ * poids (index org/poids) ou pertinence (recherche).
+ */
+export const search = query({
+  args: {
+    paginationOpts: paginationOptsValidator,
+    status: v.optional(shipmentStatusSchema),
+    priority: v.optional(prioritySchema),
+    hubId: v.optional(v.id("hubs")),
+    q: v.optional(v.string()),
+    sort: v.optional(v.union(v.literal("recent"), v.literal("heavy"), v.literal("light"))),
+  },
+  returns: v.object({
+    page: v.array(shipmentFields),
+    isDone: v.boolean(),
+    continueCursor: v.string(),
+    splitCursor: v.optional(v.union(v.string(), v.null())),
+    pageStatus: v.optional(v.union(v.literal("SplitRecommended"), v.literal("SplitRequired"), v.null())),
+  }),
+  handler: async (ctx, args) => {
+    const scope = await getOrgScope(ctx);
+    if (!scope) return { page: [], isDone: true, continueCursor: "" };
+    const orgId = scope.orgId;
+    const text = args.q?.trim();
+    const hubId = args.hubId;
+
+    // Filtres secondaires (priorité, hub) appliqués par le moteur de requête,
+    // avant constitution de la page : la pagination reste exacte.
+    const secondary = <TQuery extends { filter: (fn: (q: any) => any) => TQuery }>(input: TQuery): TQuery => {
+      let out = input;
+      if (hubId) out = out.filter((q) => q.or(q.eq(q.field("fromHubId"), hubId), q.eq(q.field("toHubId"), hubId)));
+      return out;
+    };
+
+    if (text) {
+      const status = args.status;
+      const priority = args.priority;
+      return await secondary(
+        ctx.db.query("shipments").withSearchIndex("search_text", (q) => {
+          let sq = q.search("searchText", text).eq("orgId", orgId);
+          if (status) sq = sq.eq("status", status);
+          if (priority) sq = sq.eq("priority", priority);
+          return sq;
+        }),
+      ).paginate(args.paginationOpts);
+    }
+
+    const byPriority = <TQuery extends { filter: (fn: (q: any) => any) => TQuery }>(input: TQuery): TQuery =>
+      args.priority ? input.filter((q) => q.eq(q.field("priority"), args.priority)) : input;
+
+    if (args.sort === "heavy" || args.sort === "light") {
+      const base = ctx.db
+        .query("shipments")
+        .withIndex("by_org_and_weight", (q) => q.eq("orgId", orgId))
+        .order(args.sort === "heavy" ? "desc" : "asc");
+      const withStatus = args.status ? base.filter((q) => q.eq(q.field("status"), args.status)) : base;
+      return await secondary(byPriority(withStatus)).paginate(args.paginationOpts);
+    }
+
+    const status = args.status;
+    const base = status
+      ? ctx.db.query("shipments").withIndex("by_org_and_status", (q) => q.eq("orgId", orgId).eq("status", status))
+      : ctx.db.query("shipments").withIndex("by_org", (q) => q.eq("orgId", orgId));
+    return await secondary(byPriority(base.order("desc"))).paginate(args.paginationOpts);
+  },
+});
+
+/** Migration ponctuelle : calcule searchText pour les expéditions existantes. */
+export const backfillSearchText = internalMutation({
+  args: { cursor: v.union(v.string(), v.null()) },
+  returns: v.object({ updated: v.number(), isDone: v.boolean(), cursor: v.string() }),
+  handler: async (ctx, { cursor }) => {
+    const res = await ctx.db.query("shipments").paginate({ cursor, numItems: 200 });
+    let updated = 0;
+    for (const s of res.page) {
+      const searchText = buildSearchText(s);
+      if (s.searchText !== searchText) {
+        await ctx.db.patch("shipments", s._id, { searchText });
+        updated += 1;
+      }
+    }
+    return { updated, isDone: res.isDone, cursor: res.continueCursor };
   },
 });
 
@@ -326,6 +447,7 @@ export async function createShipmentCore(
     ...(args.declaredValueEur !== undefined && args.declaredValueEur > 0
       ? { declaredValueEur: args.declaredValueEur }
       : {}),
+    searchText: buildSearchText({ reference, customerName, customerRef: args.customerRef }),
   });
   await recordTrackingEvent(ctx, {
     orgId,
@@ -500,6 +622,13 @@ export const update = mutation({
         throw new Error("La valeur déclarée doit être positive");
       }
       patch.declaredValueEur = args.declaredValueEur ?? undefined;
+    }
+    if (patch.customerName !== undefined || args.customerRef !== undefined) {
+      patch.searchText = buildSearchText({
+        reference: shipment.reference,
+        customerName: patch.customerName ?? shipment.customerName,
+        customerRef: args.customerRef !== undefined ? patch.customerRef : shipment.customerRef,
+      });
     }
     await ctx.db.patch("shipments", args.shipmentId, patch);
     return null;

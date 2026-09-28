@@ -1,8 +1,8 @@
 import { Link, createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
 import { convexQuery } from '@convex-dev/react-query'
-import { useMutation } from 'convex/react'
-import { useState } from 'react'
+import { useMutation, usePaginatedQuery } from 'convex/react'
+import { useEffect, useState } from 'react'
 import { api } from '../../../../convex/_generated/api'
 import { Field, Modal, NumberInput, Select, TextInput } from '../../../components/form'
 import {
@@ -35,7 +35,6 @@ const emptyForm = {
 function ShipmentsPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
-  const { data: shipments } = useSuspenseQuery(convexQuery(api.shipments.list, {}))
   const { data: hubs } = useSuspenseQuery(convexQuery(api.hubs.list, {}))
   const { data: currentUser } = useSuspenseQuery(convexQuery(api.organizations.currentUser, {}))
   const createShipment = useMutation(api.shipments.create)
@@ -55,38 +54,37 @@ function ShipmentsPage() {
     ? hubs[0]._id
     : ''
 
-  const filteredShipments = shipments
-    .filter((s) => {
-      if (status !== 'all' && s.status !== status) return false
-      if (priority !== 'all' && s.priority !== priority) return false
-      if (hubFilter !== 'all' && s.fromHubId !== hubFilter && s.toHubId !== hubFilter) {
-        return false
-      }
-      if (query.trim()) {
-        const q = query.trim().toLowerCase()
-        const haystack = [s.reference, s.customerName, s.customerRef ?? '']
-          .join(' ')
-          .toLowerCase()
-        if (!haystack.includes(q)) return false
-      }
-      return true
-    })
-    .sort((a, b) => {
-      if (sortBy === 'heavy') return b.weight - a.weight
-      if (sortBy === 'light') return a.weight - b.weight
-      return b.createdAt - a.createdAt
-    })
+  // Recherche avec anti-rebond : on n'interroge l'index qu'une fois la frappe posée.
+  const [debounced, setDebounced] = useState('')
+  useEffect(() => {
+    const t = setTimeout(() => setDebounced(query.trim()), 250)
+    return () => clearTimeout(t)
+  }, [query])
+
+  const { results: filteredShipments, status: pageStatus, loadMore } = usePaginatedQuery(
+    api.shipments.search,
+    {
+      ...(status !== 'all' ? { status: status as 'pending' | 'loading' | 'in_transit' | 'delivered' | 'delayed' | 'cancelled' } : {}),
+      ...(priority !== 'all' ? { priority: priority as 'low' | 'normal' | 'high' | 'urgent' } : {}),
+      ...(hubFilter !== 'all' ? { hubId: hubFilter as Id<'hubs'> } : {}),
+      ...(debounced ? { q: debounced } : {}),
+      sort: sortBy as 'recent' | 'heavy' | 'light',
+    },
+    { initialNumItems: 30 },
+  )
+  const { data: statusCounts } = useSuspenseQuery(convexQuery(api.shipments.statusCounts, {}))
+  const fmtCount = (n: number | undefined) => `${(n ?? 0).toLocaleString('fr-FR')}${statusCounts.capped && (n ?? 0) >= 5000 ? '+' : ''}`
 
   const hubById = new Map(hubs.map((h) => [h._id as string, h]))
   const hubName = (id: string) => hubById.get(id)?.city ?? id.slice(-4)
 
   const counts = {
-    all: shipments.length,
-    pending: shipments.filter((s) => s.status === 'pending').length,
-    in_transit: shipments.filter((s) => s.status === 'in_transit').length,
-    delivered: shipments.filter((s) => s.status === 'delivered').length,
-    delayed: shipments.filter((s) => s.status === 'delayed').length,
-    loading: shipments.filter((s) => s.status === 'loading').length,
+    all: fmtCount(statusCounts.counts.all),
+    pending: fmtCount(statusCounts.counts.pending),
+    in_transit: fmtCount(statusCounts.counts.in_transit),
+    delivered: fmtCount(statusCounts.counts.delivered),
+    delayed: fmtCount(statusCounts.counts.delayed),
+    loading: fmtCount(statusCounts.counts.loading),
   }
 
   const hasHubs = hubs.length >= 2
@@ -160,7 +158,7 @@ function ShipmentsPage() {
       <div className="toolbar">
         <input
           className="searchbox"
-          placeholder="Rechercher (réf., client…)"
+          placeholder="Rechercher (réf., client, réf. client…)"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
@@ -213,7 +211,14 @@ function ShipmentsPage() {
             </tr>
           </thead>
           <tbody>
-            {filteredShipments.length === 0 && (
+            {pageStatus === 'LoadingFirstPage' && (
+              <tr>
+                <td colSpan={7}>
+                  <div className="empty-state">Chargement…</div>
+                </td>
+              </tr>
+            )}
+            {pageStatus !== 'LoadingFirstPage' && filteredShipments.length === 0 && (
               <tr>
                 <td colSpan={7}>
                   <div className="empty-state">
@@ -268,6 +273,13 @@ function ShipmentsPage() {
             ))}
           </tbody>
         </table>
+        {(pageStatus === 'CanLoadMore' || pageStatus === 'LoadingMore') && (
+          <div style={{ display: 'flex', justifyContent: 'center', padding: '16px' }}>
+            <button type="button" className="btn" disabled={pageStatus === 'LoadingMore'} onClick={() => loadMore(30)}>
+              {pageStatus === 'LoadingMore' ? 'Chargement…' : `Charger plus (${filteredShipments.length} affichées)`}
+            </button>
+          </div>
+        )}
       </div>
 
       {showCreate && (
